@@ -6,7 +6,12 @@ module.exports = {
   entry: path.resolve(__dirname, 'src/index.js'),
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'player.js'
+    filename: 'NXPlayer.js',
+    library: {
+      name: 'NXPlayer',
+      type: 'umd',
+      export: 'default'
+    }
   },
   devServer: {
     static: {

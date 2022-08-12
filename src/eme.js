@@ -15,6 +15,14 @@
 //   });
 // }
 
+const keySystems = {
+    widevine: ['com.widevine.alpha'],
+    playready: ['com.microsoft.playready', 'com.youtube.playready'],
+    clearkey: ['webkit-org.w3.clearkey', 'org.w3.clearkey'],
+    primetime: ['com.adobe.primetime', 'com.adobe.access'],
+    fairplay: ['com.apple.fps', 'com.apple.fps.1_0', 'com.apple.fps.2_0', 'com.apple.fps.3_0']
+};
+
 var ensurePromise;
 var session;
 
