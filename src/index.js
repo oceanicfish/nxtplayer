@@ -1,6 +1,6 @@
 import { parseMPD, reloadMPD } from "./mpd";
-import { setupEME } from "./drm";
-import { sleep, getMedia } from "./utils";
+import { initializeEME } from './drm';
+import { getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
 
 class NXPlayer {
@@ -10,210 +10,221 @@ class NXPlayer {
   }
 
   /**
-  * The main entrance of nxtPlayer
-  * @returns 
-  */
+   * The main entrance of nxtPlayer
+   * @returns
+   */
   async play() {
     /** pre-define sourceBuffer */
     let videoSrcBuffer;
     let audioSrcBuffer;
-    
-    /** --- update manifest data --- **/
-    // const startReloadingLoop = async () => {
-    //   var startTime = new Date().getTime();
-    //   while (true) {
-    //     var fetchTime = new Date().getTime();
-    //     if (new Date().getTime() - startTime >= 2000) {
-    //       console.log('reload manifest...');
-    //       manifestData = await reloadMPD();
-    //       console.log('manifest reloaded.');
-    //       numberOfVideoChunks = manifestData.playlists[0].segments.length;
-    //       numberOfAudioChunks = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments.length;
-    //       startTime = fetchTime;
-    //     }
-    //     sleep(100);
-    //   }
-    // };
-    // startReloadingLoop();
-    
-    /** parse manifest by 'mpd-parser' */
-    let manifestData = await parseMPD();
-
+    var manifestData;
     var videoTrack = new NXTMediaTrack();
-    videoTrack.setAllSegments(manifestData.playlists[0].segments);
-    let numberOfVideoChunks = videoTrack.segments.length;
-
     var audioTrack = new NXTMediaTrack();
+    var numberOfVideoChunks;
+    var numberOfAudioChunks;
+    var videoIndex = 0;
+    var audioIndex = 0;
+    var firstReload = true;
+
+    /** parse manifest by 'mpd-parser' */
+    manifestData = await parseMPD(this.options.url);
+
+    /** --- update manifest data --- **/
+    /** start the reloading */
+    setInterval(async () => {
+      if (!firstReload) {
+        console.log('=> => => [reloadManifest] start');
+        manifestData = await reloadMPD(this.options.url);
+        console.log('=> => => [reloadManifest] manifest reloaded');
+        videoTrack.appendSegment(manifestData.playlists[0].segments);
+        numberOfVideoChunks = videoTrack.segments.length;
+        audioTrack.appendSegment(manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments);
+        numberOfAudioChunks = audioTrack.segments.length;
+        console.log('=> => => [reloadManifest] end');
+      }else {
+        firstReload = false;
+      }
+    }, 10000);
+
+    videoTrack.setAllSegments(manifestData.playlists[0].segments);
+    numberOfVideoChunks = videoTrack.segments.length;
     audioTrack.setAllSegments(manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments);
-    let numberOfAudioChunks = audioTrack.segments.length;
+    numberOfAudioChunks = audioTrack.segments.length;
+    console.log(
+      '=> => => the first segment = ',
+      manifestData.playlists[0].segments[0].timeline,
+      manifestData.playlists[0].segments[0].uri
+    );
+    console.log(
+      '=> => => the last segment = ',
+      manifestData.playlists[0].segments[numberOfVideoChunks - 1].timeline,
+      manifestData.playlists[0].segments[numberOfVideoChunks - 1].uri
+    );
 
     // aws multi period
-    var initUrl = manifestData.playlists[0].segments[0].map.resolvedUri;
-    // tears widevine test
-    // var initUrl = manifestData.playlists[0].sidx.uri
-    var initSegment = initUrl;
-
-    // aws multi period
-    var audioInitUrl = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
-    // tears widevine test
-    // var audioInitUrl = manifestData.mediaGroups.AUDIO.audio.en.playlists[0].sidx.uri;
-    var audioInitSegment = audioInitUrl;
-    // var initUrl = baseUrl + manifestData.playlists[0].segments[0].map.uri;
+    var initSegment = manifestData.playlists[0].segments[0].map.resolvedUri;
+    var audioInitSegment = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
 
     /** get video element under control */
-    const video = document.querySelector("video");
-    // const video = this.video;
+    const video = document.querySelector('video');
 
     /** check if the browser supports MSE or not */
     if (!window.MediaSource) {
-      console.error("No Media Source API available");
+      console.error('No Media Source API available');
       return;
     }
 
     /** create MSE instance */
-    let mediaSource = new MediaSource();
+    const mediaSource = new MediaSource();
+    /** set mediaSource to video element */
     video.src = window.URL.createObjectURL(mediaSource);
-
-    // Log events dispatched to make debugging easier...
-    [ "canplay", "canplaythrough", "encrypted", "ended", "error", "loadeddata",
-      "loadedmetadata", "loadstart", "pause", "play", "playing", "progress",
-      "stalled", "suspend", "waiting",
-    ].forEach(function (e) {
-      video.addEventListener(e, function(event) {
-        console.log("EVENT: " + e);
-      }, false);
-    });
-
-    let videoMimeType = 'video/mp4; codecs="avc1.64001e"';
-    let audioMimeType = 'audio/mp4; codecs="mp4a.40.2"';
+    /** define media mime type (should be constant or read from manifest later on) */
+    const videoMimeType = 'video/mp4; codecs="avc1.64001e"';
+    const audioMimeType = 'audio/mp4; codecs="mp4a.40.2"';
 
     /** Add callback function [onMediaSourceOpen]  */
-    mediaSource.addEventListener("sourceopen", onMediaSourceOpen);
-    video.addEventListener('canplay', function() {
+    mediaSource.addEventListener('sourceopen', onMediaSourceOpen);
+
+    /**
+     * video element event listeners
+     */
+    video.addEventListener('canplay', function () {
       video.play();
     });
+    // --- timeupdate --- //
+    // video.addEventListener('timeupdate', function () {
+    //   console.log('=> => => [timeupdate] currentTime = ', video.currentTime);
+    //   videoSrcBuffer.remove(0, parseInt(video.currentTime));
+    //   audioSrcBuffer.remove(0, parseInt(video.currentTime));
+    //   console.log('=> => => [timeupdate] source buffer removed.');
+    // });
+    // --- waiting --- //
+    // video.addEventListener('waiting', function() {
+    //   console.log('=> => => video event = waiting ');
+    //   console.log('=> => => video.buffered: ', video.buffered);
+    //   // video.play();
+    // });
+    // --- stalled --- //
+    // video.addEventListener('stalled', function() {
+    //   console.log('=> => => video event = stalled ');
+    //   console.log('=> => => video.buffered: ', video.buffered);
+    //   // video.play();
+    // });
+    // --- waitingforkey --- //
+    // video.addEventListener('waitingforkey', function(event) {
+    //   console.log('=> => => waitingforkey: ', event);
+    //   console.log('=> => => mediasource.readyState: ', mediaSource.readyState);
+    // });
 
+    initializeEME(this.options.drm);
     /**
-    * Setup EME Options
-    */
-    // var emeOptions;
-    // if (typeof(MediaKeySystemAccess.prototype.getConfiguration) == "undefined") {
-    //   // Firefox 43 and earlier used a different style of defining configurations
-    //   // for navigator.requestMediaKeySystem that doesn't match the current spec.
-    //   log("Detected obsolete navigator.requestMediaKeySystem options style.");
-    //   emeOptions = [
-    //     {
-    //       initDataType: "cenc",
-    //       videoType: videoMimeType,
-    //       audioType: audioMimeType
-    //     }
-    //   ];
-    // } else {
-    //   emeOptions = [
-    //     {
-    //       initDataTypes: ['keyids','cenc'],
-    //       videoCapabilities: [{contentType: videoMimeType}],
-    //       audioCapabilities: [{contentType: audioMimeType}],
-    //     }
-    //   ];
-    // }
-
-    /**
-    * Initialize Encrypted Media Extention
-    */
-    // setupEME(video, keySystems.widevine[0], emeOptions);
-
-    /**
-    * 
-    */
+     *
+     */
     function onMediaSourceOpen() {
-
       videoSrcBuffer = mediaSource.addSourceBuffer(videoMimeType);
       videoSrcBuffer.mode = 'sequence';
-      
       audioSrcBuffer = mediaSource.addSourceBuffer(audioMimeType);
       audioSrcBuffer.mode = 'sequence';
-
-      videoSrcBuffer.addEventListener("updateend", nextSegment("video"));
-      audioSrcBuffer.addEventListener("updateend", nextSegment("audio"));
-
+      videoSrcBuffer.addEventListener('updateend', nextSegment('video'));
+      audioSrcBuffer.addEventListener('updateend', nextSegment('audio'));
       // aws multi period
       var initUrl = manifestData.playlists[0].segments[0].map.resolvedUri;
-      // tears widevine test
-      // var initUrl = manifestData.playlists[0].sidx.uri
-      var initSegment = initUrl;
-
-      // aws multi period
       var audioInitUrl = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
-      // tears widevine test
-      // var audioInitUrl = manifestData.mediaGroups.AUDIO.audio.en.playlists[0].sidx.uri;
-      var audioInitSegment = audioInitUrl;
-      // var initUrl = baseUrl + manifestData.playlists[0].segments[0].map.uri;
-
-      getMedia(initUrl).then(appendToBuffer("video"));
-      getMedia(audioInitUrl).then(appendToBuffer("audio"));
+      getMedia(initUrl).then(appendToBuffer('video'));
+      getMedia(audioInitUrl).then(appendToBuffer('audio'));
     }
 
     function nextSegment(type) {
-      let videoIndex = 0;
-      let audioIndex = 0;
-      // const tmpUrl = type === "video" ? templateUrl : audioTmpUrl;
-      const sourcebuffer = type === "video" ? videoSrcBuffer : audioSrcBuffer;
+      const sourcebuffer = type === 'video' ? videoSrcBuffer : audioSrcBuffer;
       return function () {
-
-        if (manifestData.playlists[0].segments.length === 0) { 
-          sourcebuffer.removeEventListener("updateend", nextSegment);
+        if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 30) {
+          console.log('=> => => [removeSourceBuffer] buffer is too big to append');
           return;
         }
 
-        if (type === "video") {
-          const segmentUrl = videoTrack.getSegmentUrl(videoIndex);
-          console.log('segmentUrl >>> ', segmentUrl);
-          
-          if (videoTrack.getSegment(videoIndex).map.resolvedUri === initSegment) {
-            getMedia(segmentUrl).then(appendToBuffer(type));
-            videoIndex++;
-          } else {
-            initSegment = manifestData.playlists[0].segments[videoIndex].map.resolvedUri;
-            getMedia(initSegment).then(appendToBuffer(type));
+        if (manifestData.playlists[0].segments.length === 0) {
+          sourcebuffer.removeEventListener('updateend', nextSegment);
+          return;
+        }
+        if (type === 'video') {
+          var segmentUrl = videoTrack.getSegmentUrl(videoIndex);
+          if (!segmentUrl) {
+            return;
           }
-          // const segmentUrl = baseUrl + manifestData.playlists[0].segments[index].uri;
-          
+          if (videoTrack.getSegment(videoIndex)) {
+            if (videoTrack.getSegment(videoIndex).map.resolvedUri === initSegment) {
+              // removeSourceBuffer(sourcebuffer);
+              getMedia(segmentUrl).then(appendToBuffer(type));
+              // videoTrack.removeSegment(videoIndex);
+              videoIndex++;
+            } else {
+              initSegment = videoTrack.getSegment(videoIndex).map.resolvedUri;
+              getMedia(initSegment).then(appendToBuffer(type));
+            }
+          }
           if (videoIndex > numberOfVideoChunks) {
-            sourcebuffer.removeEventListener("updateend", nextSegment);
+            sourcebuffer.removeEventListener('updateend', nextSegment);
           }
         } else {
           const audioSegmentUrl = audioTrack.getSegmentUrl(audioIndex);
-          console.log('audioSegmentUrl >>> ', audioSegmentUrl);
-          if (audioTrack.getSegment(audioIndex).map.resolvedUri === audioInitSegment) {
-            getMedia(audioSegmentUrl).then(appendToBuffer(type));
-            audioIndex++;
-          } else {
-            audioInitSegment = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[audioIndex].map.resolvedUri;
-            getMedia(audioInitSegment).then(appendToBuffer(type));
+          if (!audioSegmentUrl) {
+            return;
           }
-          
+          if (audioTrack.getSegment(audioIndex)) {
+            if (audioTrack.getSegment(audioIndex).map.resolvedUri === audioInitSegment) {
+              // removeSourceBuffer(sourcebuffer);
+              getMedia(audioSegmentUrl).then(appendToBuffer(type));
+              // audioTrack.removeSegment(audioIndex);
+              audioIndex++;
+            } else {
+              audioInitSegment = audioTrack.getSegment(audioIndex).map.resolvedUri;
+              getMedia(audioInitSegment).then(appendToBuffer(type));
+            }
+          }
           if (audioIndex > numberOfAudioChunks) {
-            sourcebuffer.removeEventListener("updateend", nextSegment);
+            sourcebuffer.removeEventListener('updateend', nextSegment);
           }
         }
-        
       };
     }
 
     function appendToBuffer(type) {
-      const sourcebuffer = type === "video" ? videoSrcBuffer : audioSrcBuffer;
+      const sourcebuffer = type === 'video' ? videoSrcBuffer : audioSrcBuffer;
       return function (chunk, error) {
-        if (error && mediaSource.readyState === "open") {
-          mediaSource.endOfStream();
-          return;
-        }
-
-        if (chunk) {
-          sourcebuffer.appendBuffer(new Uint8Array(chunk));
+        if (mediaSource.readyState === 'open' && sourcebuffer && sourcebuffer.updating === false) {
+          if (chunk) {
+            try {
+              console.log('=> => => [appendToBuffer] append chunk data to source buffer.');
+              sourcebuffer.appendBuffer(new Uint8Array(chunk));
+              console.log('=> => => [appendToBuffer] source buffer appended.');
+            } catch (e) {
+              console.error(e);
+              console.error(video.error);
+              return;
+            }
+          }
         }
       };
     }
+
+    /** source buffer monitoring, source buffer removing */
+    setInterval(async () =>{
+      if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 30) {
+        console.log(
+          '=> => => [removeSourceBuffer] start = ',
+          video.buffered.start(0),
+          ', end = ',
+          video.buffered.end(0),
+          ', video.currentTime = ',
+          video.currentTime
+        );
+        if (video.currentTime - 10 > 0) {
+          videoSrcBuffer.remove(0, video.currentTime - 10);
+          audioSrcBuffer.remove(0, video.currentTime - 10);
+          console.log('=> => => [removeSourceBuffer] source buffer removed.');
+        }
+      }
+    }, 1000);
   }
 }
 
