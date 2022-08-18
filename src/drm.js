@@ -22,7 +22,7 @@ const config = [
 var video;
 var licenseUrl;
 var customData;
-const requestHeaderKey = 'x-dt-custom-data';
+var requestHeaderKey = 'x-dt-custom-data';
 
 async function getKey(challenge) {
   return new Promise(function (resolve) {
@@ -69,6 +69,10 @@ async function initializeEME(drminfo) {
   }
   licenseUrl = drminfo.widevine.url;
   customData = drminfo.widevine.customData;
+  if (drminfo.widevine.customDataHeaderKey 
+        && drminfo.widevine.customDataHeaderKey.length > 0) {
+    requestHeaderKey = drminfo.widevine.customDataHeaderKey;
+  }
   await creatKeySystem();
   video.addEventListener('encrypted', onEncrypted, false);
 }
