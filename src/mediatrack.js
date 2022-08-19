@@ -1,8 +1,30 @@
 export class NXTMediaTrack {
+  type;
   segments = [];
+  representations = [];
+  representationId = 0;
 
-  constructor() {
+  constructor(type) {
+    this.type = type;
     this.segments = [];
+    this.representations = [];
+    this.representationId = 0;
+  }
+
+  setRepresentations(representations) {
+    this.representations = representations;
+  }
+
+  setRpresentationId(id) {
+    this.representationId = id;
+  }
+
+  getInitialSegment() {
+    return this.representations[this.representationId].segments[0];
+  }
+
+  resetPresentations(newPresentations) {
+    this.representations = newPresentations;
   }
 
   appendSegment(newSegments) {
@@ -26,17 +48,17 @@ export class NXTMediaTrack {
     // console.log(this.segments);
   }
 
-  removeSegment(index) {
-    var segments = this.segments.filter(function(s) { return s.number != index});
-    // console.log(segments);
-    this.segments = segments;
-  }
+  // removeSegment(index) {
+  //   var segments = this.segments.filter(function(s) { return s.number != index});
+  //   // console.log(segments);
+  //   this.segments = segments;
+  // }
 
   getSegment(number) {
     var segment;
-    for (var i = 0; i < this.segments.length; i++) {
-      if (this.segments[i].number === number) {
-        segment = this.segments[i];
+    for (var i = 0; i < this.representations[this.representationId].segments.length; i++) {
+      if (this.representations[this.representationId].segments[i].number === number) {
+        segment = this.representations[this.representationId].segments[i];
         break;
       }
     }
@@ -47,23 +69,27 @@ export class NXTMediaTrack {
     this.segments = segments;
   }
 
-  getAllSegments() {
-    return this._segments;
+  getSegmentLength() {
+    return this.representations[this.representationId].segments.length;
   }
 
-  setTrackName(trackName) {
-    this.trackName = trackName;
-  }
+  // getAllSegments() {
+  //   return this._segments;
+  // }
 
-  getSegmentUrl(number) {
-    try {
-      var s = this.getSegment(number);
-      if (!s) {
-        return null;
-      }
-      return s.resolvedUri;
-    }catch (e) {
-      console.error(e.stack);
-    }
-  }
+  // setTrackName(trackName) {
+  //   this.trackName = trackName;
+  // }
+
+  // getSegmentUrl(number) {
+  //   try {
+  //     var s = this.getSegment(number);
+  //     if (!s) {
+  //       return null;
+  //     }
+  //     return s.resolvedUri;
+  //   }catch (e) {
+  //     console.error(e.stack);
+  //   }
+  // }
 }

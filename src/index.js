@@ -20,10 +20,8 @@ class NXPlayer {
     let videoSourceBuffer;
     let audioSourceBuffer;
     var manifestData;
-    var videoTrack = new NXTMediaTrack();
-    var audioTrack = new NXTMediaTrack();
-    var numberOfVideoChunks;
-    var numberOfAudioChunks;
+    var videoTrack = new NXTMediaTrack('video');
+    var audioTrack = new NXTMediaTrack('audio');
     var videoIndex = 0;
     var audioIndex = 0;
     var firstReload = true;
@@ -40,34 +38,20 @@ class NXPlayer {
         console.log('=> => => [reloadManifest] start');
         manifestData = await reloadMPD(this.options.url);
         console.log('=> => => [reloadManifest] manifest reloaded');
-        videoTrack.appendSegment(manifestData.playlists[representationId].segments);
-        numberOfVideoChunks = videoTrack.segments.length;
-        audioTrack.appendSegment(manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments);
-        numberOfAudioChunks = audioTrack.segments.length;
+        videoTrack.resetPresentations(manifestData.playlists);
+        audioTrack.resetPresentations(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
         console.log('=> => => [reloadManifest] end');
       }else {
         firstReload = false;
       }
     }, 10000);
 
-    videoTrack.setAllSegments(manifestData.playlists[representationId].segments);
-    numberOfVideoChunks = videoTrack.segments.length;
-    audioTrack.setAllSegments(manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments);
-    numberOfAudioChunks = audioTrack.segments.length;
-    console.log(
-      '=> => => the first segment = ',
-      manifestData.playlists[representationId].segments[0].timeline,
-      manifestData.playlists[representationId].segments[0].uri
-    );
-    console.log(
-      '=> => => the last segment = ',
-      manifestData.playlists[representationId].segments[numberOfVideoChunks - 1].timeline,
-      manifestData.playlists[representationId].segments[numberOfVideoChunks - 1].uri
-    );
+    videoTrack.setRepresentations(manifestData.playlists);
+    audioTrack.setRepresentations(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
 
     // aws multi period
-    var initSegment = manifestData.playlists[representationId].segments[0].map.resolvedUri;
-    var audioInitSegment = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
+    var videoInitialSegmentUri = videoTrack.getInitialSegment().map.resolvedUri;
+    var audioInitialSegmentUri = audioTrack.getInitialSegment().map.resolvedUri;
 
     /** get video element under control */
     const video = document.querySelector('video');
@@ -101,19 +85,24 @@ class NXPlayer {
      *
      */
     function onMediaSourceOpen() {
+      console.warn('=> => => onMediaSourceOpen start');
       videoSourceBuffer = mediaSource.addSourceBuffer(videoMimeType);
       videoSourceBuffer.mode = 'sequence';
       audioSourceBuffer = mediaSource.addSourceBuffer(audioMimeType);
       audioSourceBuffer.mode = 'sequence';
       videoSourceBuffer.addEventListener('updateend', nextSegment('video'));
       audioSourceBuffer.addEventListener('updateend', nextSegment('audio'));
-      // aws multi period
-      var initUrl = manifestData.playlists[representationId].segments[0].map.resolvedUri;
-      var audioInitUrl = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
-      getMedia(initUrl).then(appendToBuffer('video'));
-      getMedia(audioInitUrl).then(appendToBuffer('audio'));
+      // start loading the initial segment
+      getMedia(videoInitialSegmentUri).then(appendToBuffer('video'));
+      getMedia(audioInitialSegmentUri).then(appendToBuffer('audio'));
+      console.warn('=> => => onMediaSourceOpen end');
     }
 
+    /**
+     * calculate the next segment
+     * @param {*} type 
+     * @returns 
+     */
     function nextSegment(type) {
       const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
       return function () {
@@ -128,37 +117,36 @@ class NXPlayer {
           let currentVideoSegment = videoTrack.getSegment(videoIndex);
           // if the current segment is available, append it to the source buffer.
           if (currentVideoSegment) {
-            if (currentVideoSegment.map.resolvedUri === initSegment) {
+            if (currentVideoSegment.map.resolvedUri === videoInitialSegmentUri) {
               getMedia(currentVideoSegment.resolvedUri).then(appendToBuffer(type));
               videoIndex++;
             } else {
-              initSegment = currentVideoSegment.map.resolvedUri;
-              getMedia(initSegment).then(appendToBuffer(type));
+              videoInitialSegmentUri = currentVideoSegment.map.resolvedUri;
+              getMedia(videoInitialSegmentUri).then(appendToBuffer(type));
             }
-          }
-          if (videoIndex > numberOfVideoChunks) {
-            sourcebuffer.removeEventListener('updateend', nextSegment);
           }
         } else {
           // get the current audio segment
           let currentAudioSegment = audioTrack.getSegment(audioIndex);
           // if the current segment is available, append it to the source buffer.
           if (currentAudioSegment) {
-            if (currentAudioSegment.map.resolvedUri === audioInitSegment) {
+            if (currentAudioSegment.map.resolvedUri === audioInitialSegmentUri) {
               getMedia(currentAudioSegment.resolvedUri).then(appendToBuffer(type));
               audioIndex++;
             } else {
-              audioInitSegment = currentAudioSegment.map.resolvedUri;
-              getMedia(audioInitSegment).then(appendToBuffer(type));
+              audioInitialSegmentUri = currentAudioSegment.map.resolvedUri;
+              getMedia(audioInitialSegmentUri).then(appendToBuffer(type));
             }
-          }
-          if (audioIndex > numberOfAudioChunks) {
-            sourcebuffer.removeEventListener('updateend', nextSegment);
           }
         }
       };
     }
 
+    /**
+     * append buffer data
+     * @param {*} type 
+     * @returns 
+     */
     function appendToBuffer(type) {
       const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
       return function (chunk, error) {
