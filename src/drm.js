@@ -22,9 +22,9 @@ const config = [
 var video;
 var licenseUrl;
 var customData;
-var requestHeaderKey = 'x-dt-custom-data';
+var requestHeaderKey = 'AcquireLicenseAssertion';
 
-async function getKey(challenge) {
+function getKey(challenge) {
   return new Promise(function (resolve) {
     var xhr = new XMLHttpRequest();
     xhr.open('POST', licenseUrl, true);
@@ -37,7 +37,7 @@ async function getKey(challenge) {
   });
 }
 
-async function generateLicense(message) {
+function generateLicense(message) {
   return new Promise(function (resolve) {
     var challenge = message;
     return getKey(challenge).then(function (key) {
@@ -78,7 +78,7 @@ async function initializeEME(drminfo) {
 }
 
 function onEncrypted(event) {
-  console.log('=> => => onEncrypted', event);
+  // console.log('=> => => onEncrypted', event);
   if (!video.mediaKeys) {
     return;
   }
@@ -92,9 +92,9 @@ function onEncrypted(event) {
 }
 
 async function onMessage(event) {
-  console.log('=> => => onMessage', event);
+  // console.log('=> => => onMessage', event);
   generateLicense(event.message).then(function (license) {
-    console.log('=> => => license: ', license);
+    // console.log('=> => => license: ', license);
     var session = event.target;
     session.update(license).catch(function (err) {
       console.error('=> => => Failed to update the session: ', err);

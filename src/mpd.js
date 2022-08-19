@@ -13,7 +13,9 @@ var parsedManifest;
 async function parseMPD(manifestUri) {
   const res = await fetch(manifestUri);
   const manifest = await res.text();
+  // console.log(manifest);
   parsedManifest = mpdParser(manifest, { manifestUri });
+  // console.log(parsedManifest);
   return parsedManifest;
 }
 

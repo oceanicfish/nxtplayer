@@ -5,8 +5,10 @@ import { NXTMediaTrack } from "./mediatrack"
 
 class NXPlayer {
   options;
+  currentRepresentationId;
   constructor(options) {
     this.options = options;
+    this.currentRepresentationId = 0;
   }
 
   /**
@@ -15,8 +17,8 @@ class NXPlayer {
    */
   async play() {
     /** pre-define sourceBuffer */
-    let videoSrcBuffer;
-    let audioSrcBuffer;
+    let videoSourceBuffer;
+    let audioSourceBuffer;
     var manifestData;
     var videoTrack = new NXTMediaTrack();
     var audioTrack = new NXTMediaTrack();
@@ -25,9 +27,11 @@ class NXPlayer {
     var videoIndex = 0;
     var audioIndex = 0;
     var firstReload = true;
+    var representationId =  this.currentRepresentationId;
 
     /** parse manifest by 'mpd-parser' */
     manifestData = await parseMPD(this.options.url);
+
 
     /** --- update manifest data --- **/
     /** start the reloading */
@@ -36,7 +40,7 @@ class NXPlayer {
         console.log('=> => => [reloadManifest] start');
         manifestData = await reloadMPD(this.options.url);
         console.log('=> => => [reloadManifest] manifest reloaded');
-        videoTrack.appendSegment(manifestData.playlists[0].segments);
+        videoTrack.appendSegment(manifestData.playlists[representationId].segments);
         numberOfVideoChunks = videoTrack.segments.length;
         audioTrack.appendSegment(manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments);
         numberOfAudioChunks = audioTrack.segments.length;
@@ -46,23 +50,23 @@ class NXPlayer {
       }
     }, 10000);
 
-    videoTrack.setAllSegments(manifestData.playlists[0].segments);
+    videoTrack.setAllSegments(manifestData.playlists[representationId].segments);
     numberOfVideoChunks = videoTrack.segments.length;
     audioTrack.setAllSegments(manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments);
     numberOfAudioChunks = audioTrack.segments.length;
     console.log(
       '=> => => the first segment = ',
-      manifestData.playlists[0].segments[0].timeline,
-      manifestData.playlists[0].segments[0].uri
+      manifestData.playlists[representationId].segments[0].timeline,
+      manifestData.playlists[representationId].segments[0].uri
     );
     console.log(
       '=> => => the last segment = ',
-      manifestData.playlists[0].segments[numberOfVideoChunks - 1].timeline,
-      manifestData.playlists[0].segments[numberOfVideoChunks - 1].uri
+      manifestData.playlists[representationId].segments[numberOfVideoChunks - 1].timeline,
+      manifestData.playlists[representationId].segments[numberOfVideoChunks - 1].uri
     );
 
     // aws multi period
-    var initSegment = manifestData.playlists[0].segments[0].map.resolvedUri;
+    var initSegment = manifestData.playlists[representationId].segments[0].map.resolvedUri;
     var audioInitSegment = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
 
     /** get video element under control */
@@ -88,32 +92,8 @@ class NXPlayer {
     /**
      * video element event listeners
      */
-    video.addEventListener('canplay', function () {
-      video.play();
-    });
-    // --- timeupdate --- //
-    // video.addEventListener('timeupdate', function () {
-    //   console.log('=> => => [timeupdate] currentTime = ', video.currentTime);
-    //   videoSrcBuffer.remove(0, parseInt(video.currentTime));
-    //   audioSrcBuffer.remove(0, parseInt(video.currentTime));
-    //   console.log('=> => => [timeupdate] source buffer removed.');
-    // });
-    // --- waiting --- //
-    // video.addEventListener('waiting', function() {
-    //   console.log('=> => => video event = waiting ');
-    //   console.log('=> => => video.buffered: ', video.buffered);
-    //   // video.play();
-    // });
-    // --- stalled --- //
-    // video.addEventListener('stalled', function() {
-    //   console.log('=> => => video event = stalled ');
-    //   console.log('=> => => video.buffered: ', video.buffered);
-    //   // video.play();
-    // });
-    // --- waitingforkey --- //
-    // video.addEventListener('waitingforkey', function(event) {
-    //   console.log('=> => => waitingforkey: ', event);
-    //   console.log('=> => => mediasource.readyState: ', mediaSource.readyState);
+    // video.addEventListener('canplay', function () {
+    //   video.play();
     // });
 
     initializeEME(this.options.drm);
@@ -121,44 +101,38 @@ class NXPlayer {
      *
      */
     function onMediaSourceOpen() {
-      videoSrcBuffer = mediaSource.addSourceBuffer(videoMimeType);
-      videoSrcBuffer.mode = 'sequence';
-      audioSrcBuffer = mediaSource.addSourceBuffer(audioMimeType);
-      audioSrcBuffer.mode = 'sequence';
-      videoSrcBuffer.addEventListener('updateend', nextSegment('video'));
-      audioSrcBuffer.addEventListener('updateend', nextSegment('audio'));
+      videoSourceBuffer = mediaSource.addSourceBuffer(videoMimeType);
+      videoSourceBuffer.mode = 'sequence';
+      audioSourceBuffer = mediaSource.addSourceBuffer(audioMimeType);
+      audioSourceBuffer.mode = 'sequence';
+      videoSourceBuffer.addEventListener('updateend', nextSegment('video'));
+      audioSourceBuffer.addEventListener('updateend', nextSegment('audio'));
       // aws multi period
-      var initUrl = manifestData.playlists[0].segments[0].map.resolvedUri;
+      var initUrl = manifestData.playlists[representationId].segments[0].map.resolvedUri;
       var audioInitUrl = manifestData.mediaGroups.AUDIO.audio.eng.playlists[0].segments[0].map.resolvedUri;
       getMedia(initUrl).then(appendToBuffer('video'));
       getMedia(audioInitUrl).then(appendToBuffer('audio'));
     }
 
     function nextSegment(type) {
-      const sourcebuffer = type === 'video' ? videoSrcBuffer : audioSrcBuffer;
+      const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
       return function () {
-        if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 30) {
+        // buffering controlling, if the buffered length is over 60s, stop the appending.
+        if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 60) {
           console.log('=> => => [removeSourceBuffer] buffer is too big to append');
           return;
         }
-
-        if (manifestData.playlists[0].segments.length === 0) {
-          sourcebuffer.removeEventListener('updateend', nextSegment);
-          return;
-        }
+        // append buffer data
         if (type === 'video') {
-          var segmentUrl = videoTrack.getSegmentUrl(videoIndex);
-          if (!segmentUrl) {
-            return;
-          }
-          if (videoTrack.getSegment(videoIndex)) {
-            if (videoTrack.getSegment(videoIndex).map.resolvedUri === initSegment) {
-              // removeSourceBuffer(sourcebuffer);
-              getMedia(segmentUrl).then(appendToBuffer(type));
-              // videoTrack.removeSegment(videoIndex);
+          // get the current video segment
+          let currentVideoSegment = videoTrack.getSegment(videoIndex);
+          // if the current segment is available, append it to the source buffer.
+          if (currentVideoSegment) {
+            if (currentVideoSegment.map.resolvedUri === initSegment) {
+              getMedia(currentVideoSegment.resolvedUri).then(appendToBuffer(type));
               videoIndex++;
             } else {
-              initSegment = videoTrack.getSegment(videoIndex).map.resolvedUri;
+              initSegment = currentVideoSegment.map.resolvedUri;
               getMedia(initSegment).then(appendToBuffer(type));
             }
           }
@@ -166,18 +140,15 @@ class NXPlayer {
             sourcebuffer.removeEventListener('updateend', nextSegment);
           }
         } else {
-          const audioSegmentUrl = audioTrack.getSegmentUrl(audioIndex);
-          if (!audioSegmentUrl) {
-            return;
-          }
-          if (audioTrack.getSegment(audioIndex)) {
-            if (audioTrack.getSegment(audioIndex).map.resolvedUri === audioInitSegment) {
-              // removeSourceBuffer(sourcebuffer);
-              getMedia(audioSegmentUrl).then(appendToBuffer(type));
-              // audioTrack.removeSegment(audioIndex);
+          // get the current audio segment
+          let currentAudioSegment = audioTrack.getSegment(audioIndex);
+          // if the current segment is available, append it to the source buffer.
+          if (currentAudioSegment) {
+            if (currentAudioSegment.map.resolvedUri === audioInitSegment) {
+              getMedia(currentAudioSegment.resolvedUri).then(appendToBuffer(type));
               audioIndex++;
             } else {
-              audioInitSegment = audioTrack.getSegment(audioIndex).map.resolvedUri;
+              audioInitSegment = currentAudioSegment.map.resolvedUri;
               getMedia(audioInitSegment).then(appendToBuffer(type));
             }
           }
@@ -189,7 +160,7 @@ class NXPlayer {
     }
 
     function appendToBuffer(type) {
-      const sourcebuffer = type === 'video' ? videoSrcBuffer : audioSrcBuffer;
+      const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
       return function (chunk, error) {
         if (mediaSource.readyState === 'open' && sourcebuffer && sourcebuffer.updating === false) {
           if (chunk) {
@@ -209,7 +180,7 @@ class NXPlayer {
 
     /** source buffer monitoring, source buffer removing */
     setInterval(async () =>{
-      if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 30) {
+      if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 60) {
         console.log(
           '=> => => [removeSourceBuffer] start = ',
           video.buffered.start(0),
@@ -219,8 +190,8 @@ class NXPlayer {
           video.currentTime
         );
         if (video.currentTime - 10 > 0) {
-          videoSrcBuffer.remove(0, video.currentTime - 10);
-          audioSrcBuffer.remove(0, video.currentTime - 10);
+          videoSourceBuffer.remove(0, video.currentTime - 10);
+          audioSourceBuffer.remove(0, video.currentTime - 10);
           console.log('=> => => [removeSourceBuffer] source buffer removed.');
         }
       }

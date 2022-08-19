@@ -32,10 +32,10 @@ export class NXTMediaTrack {
     this.segments = segments;
   }
 
-  getSegment(index) {
+  getSegment(number) {
     var segment;
     for (var i = 0; i < this.segments.length; i++) {
-      if (this.segments[i].number === index) {
+      if (this.segments[i].number === number) {
         segment = this.segments[i];
         break;
       }
@@ -55,9 +55,9 @@ export class NXTMediaTrack {
     this.trackName = trackName;
   }
 
-  getSegmentUrl(index) {
+  getSegmentUrl(number) {
     try {
-      var s = this.getSegment(index);
+      var s = this.getSegment(number);
       if (!s) {
         return null;
       }
