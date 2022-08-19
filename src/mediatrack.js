@@ -27,26 +27,26 @@ export class NXTMediaTrack {
     this.representations = newPresentations;
   }
 
-  appendSegment(newSegments) {
-    var theLastSegment = this.segments[this.segments.length - 1];
-    /** find the update position */
-    var theUpdatedPosition =  newSegments.length - 1;
-    for (var i = newSegments.length - 1; i >= 0; i--) {
-      var newSegment = newSegments[i];
-      if (newSegment.number === theLastSegment.number) {
-        theUpdatedPosition = i + 1;
-        break;
-      }
-    }
+  // appendSegment(newSegments) {
+  //   var theLastSegment = this.segments[this.segments.length - 1];
+  //   /** find the update position */
+  //   var theUpdatedPosition =  newSegments.length - 1;
+  //   for (var i = newSegments.length - 1; i >= 0; i--) {
+  //     var newSegment = newSegments[i];
+  //     if (newSegment.number === theLastSegment.number) {
+  //       theUpdatedPosition = i + 1;
+  //       break;
+  //     }
+  //   }
 
-    for (var j = theUpdatedPosition; j < newSegments.length; j++) {
-      var updatedSegment =  newSegments[j];
-      // updatedSegment.number = theLastSegment.number + 1;
-      this.segments.push(updatedSegment);
-    }
+  //   for (var j = theUpdatedPosition; j < newSegments.length; j++) {
+  //     var updatedSegment =  newSegments[j];
+  //     // updatedSegment.number = theLastSegment.number + 1;
+  //     this.segments.push(updatedSegment);
+  //   }
 
-    // console.log(this.segments);
-  }
+  //   // console.log(this.segments);
+  // }
 
   // removeSegment(index) {
   //   var segments = this.segments.filter(function(s) { return s.number != index});

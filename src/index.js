@@ -2,13 +2,14 @@ import { parseMPD, reloadMPD } from "./mpd";
 import { initializeEME } from './drm';
 import { getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
+import { startABRController } from "./abrcontroller"
 
 class NXPlayer {
   options;
-  currentRepresentationId;
+  videoRepresentationId;
   constructor(options) {
     this.options = options;
-    this.currentRepresentationId = 0;
+    this.videoRepresentationId = 0;
   }
 
   /**
@@ -25,7 +26,7 @@ class NXPlayer {
     var videoIndex = 0;
     var audioIndex = 0;
     var firstReload = true;
-    var representationId =  this.currentRepresentationId;
+    var videoRepresentationId =  this.videoRepresentationId;
 
     /** parse manifest by 'mpd-parser' */
     manifestData = await parseMPD(this.options.url);
@@ -107,7 +108,7 @@ class NXPlayer {
       const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
       return function () {
         // buffering controlling, if the buffered length is over 60s, stop the appending.
-        if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 60) {
+        if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 20) {
           console.log('=> => => [removeSourceBuffer] buffer is too big to append');
           return;
         }
@@ -168,7 +169,7 @@ class NXPlayer {
 
     /** source buffer monitoring, source buffer removing */
     setInterval(async () =>{
-      if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 60) {
+      if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 20) {
         console.log(
           '=> => => [removeSourceBuffer] start = ',
           video.buffered.start(0),
@@ -184,6 +185,17 @@ class NXPlayer {
         }
       }
     }, 1000);
+
+    /** start the ABR controller */
+    startABRController(this, videoTrack);
+  }
+
+  /**
+   * set video representation
+   * @param {*} id 
+   */
+  setVideoRepresentation(id) {
+    this.videoRepresentationId = id;
   }
 }
 
