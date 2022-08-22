@@ -1,15 +1,52 @@
 import { parseMPD, reloadMPD } from "./mpd";
 import { initializeEME } from './drm';
-import { getMedia } from "./utils";
+import { sleep, getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
 import { startABRController } from "./abrcontroller"
 
+const EventEmitter = require('events');
+
 class NXPlayer {
+
+  setting = {
+    sourcebuffer: {
+      mode: 'sequence',
+      buffersize: 60
+    },
+  };
+
   options;
+  videoElement;
   videoRepresentationId;
+  mediaSource;
+  videoSourceBuffer;
+  audioSourceBuffer;
+  videoTrack;
+  audioTrack;
+  videoMimeType;
+  audioMimeType;
+  eventemitter;
+  /**
+   * STATUS:
+   * -1: error
+   * 0: closed
+   * 1: initialized (manifest downloaded, media source is ready for use)
+   * 2: loading (start to feed the buffer to media source)
+   */
+  playerStatus = 0;
+
   constructor(options) {
     this.options = options;
     this.videoRepresentationId = 0;
+    this.mediaSource = new MediaSource();
+    /** define media mime type (should be constant or read from manifest later on) */
+    this.videoMimeType = 'video/mp4; codecs="avc1.64001e"';
+    this.audioMimeType = 'audio/mp4; codecs="mp4a.40.2"';
+    this.eventemitter = new EventEmitter();
+    this.videoTrack = new NXTMediaTrack('video', this);
+    this.audioTrack = new NXTMediaTrack('audio', this);
+    this.playerStatus = 0;
+    this.videoElement = document.querySelector('video');
   }
 
   /**
@@ -17,177 +54,43 @@ class NXPlayer {
    * @returns
    */
   async play() {
-    /** pre-define sourceBuffer */
-    let videoSourceBuffer;
-    let audioSourceBuffer;
+    /** manifest data */
     var manifestData;
-    var videoTrack = new NXTMediaTrack('video');
-    var audioTrack = new NXTMediaTrack('audio');
-    var videoIndex = 0;
-    var audioIndex = 0;
-    var firstReload = true;
-    var videoRepresentationId =  this.videoRepresentationId;
-
-    /** parse manifest by 'mpd-parser' */
-    manifestData = await parseMPD(this.options.url);
-
-
-    /** --- update manifest data --- **/
-    /** start the reloading */
-    setInterval(async () => {
-      if (!firstReload) {
-        console.log('=> => => [reloadManifest] start');
-        manifestData = await reloadMPD(this.options.url);
-        console.log('=> => => [reloadManifest] manifest reloaded');
-        videoTrack.resetPresentations(manifestData.playlists);
-        audioTrack.resetPresentations(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
-        console.log('=> => => [reloadManifest] end');
-      }else {
-        firstReload = false;
-      }
-    }, 10000);
-
-    videoTrack.setRepresentations(manifestData.playlists);
-    audioTrack.setRepresentations(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
-
-    // aws multi period
-    var videoInitialSegmentUri = videoTrack.getInitialSegment().map.resolvedUri;
-    var audioInitialSegmentUri = audioTrack.getInitialSegment().map.resolvedUri;
 
     /** get video element under control */
-    const video = document.querySelector('video');
+    // const video = document.querySelector('video');
 
     /** check if the browser supports MSE or not */
     if (!window.MediaSource) {
-      console.error('No Media Source API available');
+      console.error('>>> [play] => => => No Media Source API available');
       return;
     }
 
-    /** create MSE instance */
-    const mediaSource = new MediaSource();
+    /** setup event listeners */
+    this.eventemitter.on('nxtBufferIsEnoughForPlay', this.onBufferIsEnoughForPlay.bind(this));
+
+    /** parse manifest by 'mpd-parser' */
+    manifestData = await parseMPD(this.options.url);
+    console.log('>>> [manifest] => => => manifest loaded');
+    this.videoTrack.prepare(manifestData.playlists);
+    // this.audioTrack.prepare(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
+    console.log('>>> [video/audio buffer] => => => start loading video/audio data ... ');
+
     /** set mediaSource to video element */
-    video.src = window.URL.createObjectURL(mediaSource);
-    /** define media mime type (should be constant or read from manifest later on) */
-    const videoMimeType = 'video/mp4; codecs="avc1.64001e"';
-    const audioMimeType = 'audio/mp4; codecs="mp4a.40.2"';
+    this.videoElement.src = window.URL.createObjectURL(this.mediaSource);
+    console.log('>>> [play] => => => media source setup, readyState = ', this.mediaSource.readyState);
 
-    /** Add callback function [onMediaSourceOpen]  */
-    mediaSource.addEventListener('sourceopen', onMediaSourceOpen);
+    this.mediaSource.addEventListener('sourceopen', this.onMediaSourceOpen.bind(this));
 
-    /**
-     * video element event listeners
-     */
-    // video.addEventListener('canplay', function () {
-    //   video.play();
-    // });
+    this.playAsync()
+    .catch((err) => {
+      console.warn('>>> [play] => => => Playback stopped, by the following error ');
+      console.error(err);
+    });
 
-    initializeEME(this.options.drm);
-    /**
-     *
-     */
-    function onMediaSourceOpen() {
-      console.warn('=> => => onMediaSourceOpen start');
-      videoSourceBuffer = mediaSource.addSourceBuffer(videoMimeType);
-      videoSourceBuffer.mode = 'sequence';
-      audioSourceBuffer = mediaSource.addSourceBuffer(audioMimeType);
-      audioSourceBuffer.mode = 'sequence';
-      videoSourceBuffer.addEventListener('updateend', nextSegment('video'));
-      audioSourceBuffer.addEventListener('updateend', nextSegment('audio'));
-      // start loading the initial segment
-      getMedia(videoInitialSegmentUri).then(appendToBuffer('video'));
-      getMedia(audioInitialSegmentUri).then(appendToBuffer('audio'));
-      console.warn('=> => => onMediaSourceOpen end');
-    }
-
-    /**
-     * calculate the next segment
-     * @param {*} type 
-     * @returns 
-     */
-    function nextSegment(type) {
-      const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
-      return function () {
-        // buffering controlling, if the buffered length is over 60s, stop the appending.
-        if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 20) {
-          console.log('=> => => [removeSourceBuffer] buffer is too big to append');
-          return;
-        }
-        // append buffer data
-        if (type === 'video') {
-          // get the current video segment
-          let currentVideoSegment = videoTrack.getSegment(videoIndex);
-          // if the current segment is available, append it to the source buffer.
-          if (currentVideoSegment) {
-            if (currentVideoSegment.map.resolvedUri === videoInitialSegmentUri) {
-              getMedia(currentVideoSegment.resolvedUri).then(appendToBuffer(type));
-              videoIndex++;
-            } else {
-              videoInitialSegmentUri = currentVideoSegment.map.resolvedUri;
-              getMedia(videoInitialSegmentUri).then(appendToBuffer(type));
-            }
-          }
-        } else {
-          // get the current audio segment
-          let currentAudioSegment = audioTrack.getSegment(audioIndex);
-          // if the current segment is available, append it to the source buffer.
-          if (currentAudioSegment) {
-            if (currentAudioSegment.map.resolvedUri === audioInitialSegmentUri) {
-              getMedia(currentAudioSegment.resolvedUri).then(appendToBuffer(type));
-              audioIndex++;
-            } else {
-              audioInitialSegmentUri = currentAudioSegment.map.resolvedUri;
-              getMedia(audioInitialSegmentUri).then(appendToBuffer(type));
-            }
-          }
-        }
-      };
-    }
-
-    /**
-     * append buffer data
-     * @param {*} type 
-     * @returns 
-     */
-    function appendToBuffer(type) {
-      const sourcebuffer = type === 'video' ? videoSourceBuffer : audioSourceBuffer;
-      return function (chunk, error) {
-        if (mediaSource.readyState === 'open' && sourcebuffer && sourcebuffer.updating === false) {
-          if (chunk) {
-            try {
-              console.log('=> => => [appendToBuffer] append chunk data to source buffer.');
-              sourcebuffer.appendBuffer(new Uint8Array(chunk));
-              console.log('=> => => [appendToBuffer] source buffer appended.');
-            } catch (e) {
-              console.error(e);
-              console.error(video.error);
-              return;
-            }
-          }
-        }
-      };
-    }
-
-    /** source buffer monitoring, source buffer removing */
-    setInterval(async () =>{
-      if (video.buffered.length && video.buffered.end(0) - video.buffered.start(0) > 20) {
-        console.log(
-          '=> => => [removeSourceBuffer] start = ',
-          video.buffered.start(0),
-          ', end = ',
-          video.buffered.end(0),
-          ', video.currentTime = ',
-          video.currentTime
-        );
-        if (video.currentTime - 10 > 0) {
-          videoSourceBuffer.remove(0, video.currentTime - 10);
-          audioSourceBuffer.remove(0, video.currentTime - 10);
-          console.log('=> => => [removeSourceBuffer] source buffer removed.');
-        }
-      }
-    }, 1000);
-
-    /** start the ABR controller */
-    startABRController(this, videoTrack);
+    this.videoElement.addEventListener('canplay', function () {
+      this.videoElement.play();
+    });
   }
 
   /**
@@ -197,6 +100,83 @@ class NXPlayer {
   setVideoRepresentation(id) {
     this.videoRepresentationId = id;
   }
+
+  async playAsync() {
+    console.log('>>> [playAsync] => => => playAsync starts');
+    var round = 0;  // FOR DEBUG ONLY
+    console.log('>>> [playAsync] => => => player engine starts');
+    var playerError;
+    try {
+      while(!playerError) {
+
+        if (this.playerStatus > 0) {
+
+          // if (this.videoElement.buffered.length && this.videoElement.buffered.end(0) - this.videoElement.buffered.start(0) > 10) {
+          //   console.log('>>> [playAsync] => => => the buffer has been bigger than 10 seconds ... ');
+          //   if (!this.videoElement.playing || this.videoElement.paused) {
+          //     this.videoElement.play();
+          //   }
+          // }
+
+
+          if (!this.audioSourceBuffer.updating) {
+            console.log('>>> [playAsync] => => => start the buffer feeding ... ');
+            let audioBuffer = this.audioTrack.nextBufferChunk();
+            let videoBuffer = this.videoTrack.nextBufferChunk();
+
+            if (!audioBuffer && !videoBuffer) {
+              this.playerStatus = 0;
+              break;
+            }
+
+            if (audioBuffer) {
+              console.log('>>> [playAsync] => => => append buffer = ', audioBuffer.url);
+              this.audioSourceBuffer.appendBuffer(new Uint8Array(audioBuffer.buffer));
+              console.log('>>> [playAsync] => => => buffer appended.');
+            }
+            if (videoBuffer) {
+              console.log('>>> [playAsync] => => => append buffer = ', videoBuffer.url);
+              this.videoSourceBuffer.appendBuffer(new Uint8Array(videoBuffer.buffer));
+              console.log('>>> [playAsync] => => => buffer appended.');
+            }
+
+            this.playerStatus = 2;
+          }
+        }
+        await sleep(500);
+        console.log('>>> [playAsync] => => => player engine round ', round++); // FOR DEBUG ONLY
+      }
+    } catch(err) {
+      this.playerStatus = -1;
+      console.warn('>>> [playAsync] => => => playback error = ', err);
+      throw err;
+    }
+  }
+
+  onMediaSourceOpen() {
+    console.log('>>> [onMediaSourceOpen] => => => media source status = ', this.mediaSource.readyState);
+    this.videoSourceBuffer = this.mediaSource.addSourceBuffer(this.videoMimeType);
+    this.audioSourceBuffer = this.mediaSource.addSourceBuffer(this.audioMimeType);
+    // set source buffser's mode
+    this.videoSourceBuffer.mode = this.setting.sourcebuffer.mode;
+    this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
+    this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
+    this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
+  }
+
+  onBufferIsEnoughForPlay() {
+    console.log('>>> [video/audio buffer] => => => video/audio data loaded. ');
+    console.log('>>> [onBufferIsEnoughForPlay] => => => buffer is enough for playback');
+    if (this.mediaSource.readyState === 'open'
+        && this.videoSourceBuffer && this.audioSourceBuffer) {
+      this.playerStatus = 1;
+    }
+  }
+
+  onSourceBufferUpdateEnd() {
+    console.log('>>> [onSourceBufferUpdateEnd] => => => buffer is update end');
+  }
+
 }
 
 export default NXPlayer;

@@ -1,3 +1,4 @@
+
 /**
  * sleep for the specified amount of time
  * @param {*} ms 
@@ -12,7 +13,7 @@ function sleep(ms) {
  * @param {*} url 
  * @returns 
  */
-function getMedia(url) {
+async function getMedia(url) {
   return fetch(url)
     .then((res) => {
       if (res.status !== 200) {
