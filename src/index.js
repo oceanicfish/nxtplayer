@@ -73,7 +73,7 @@ class NXPlayer {
     manifestData = await parseMPD(this.options.url);
     console.log('>>> [manifest] => => => manifest loaded');
     this.videoTrack.prepare(manifestData.playlists);
-    // this.audioTrack.prepare(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
+    this.audioTrack.prepare(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
     console.log('>>> [video/audio buffer] => => => start loading video/audio data ... ');
 
     /** set mediaSource to video element */
@@ -118,32 +118,30 @@ class NXPlayer {
             }
           }
 
+          console.log('>>> [playAsync] => => => start the buffer feeding ... ');
+          let audioBuffer = this.audioTrack.nextBufferChunk();
+          let videoBuffer = this.videoTrack.nextBufferChunk();
 
-          if (!this.videoSourceBuffer.updating) {
-            console.log('>>> [playAsync] => => => start the buffer feeding ... ');
-            // let audioBuffer = this.audioTrack.nextBufferChunk();
-            let videoBuffer = this.videoTrack.nextBufferChunk();
-
-            if (!videoBuffer) {
-              this.mediaSource.endOfStream();
-              // this.videoElement.play();
-              this.playerStatus = 0;
-              break;
-            }
-
-            // if (audioBuffer) {
-            //   console.log('>>> [playAsync] => => => append buffer = ', audioBuffer.url);
-            //   this.audioSourceBuffer.appendBuffer(new Uint8Array(audioBuffer.buffer));
-            //   console.log('>>> [playAsync] => => => buffer appended.');
-            // }
-            if (videoBuffer) {
-              console.log('>>> [playAsync] => => => append buffer = ', videoBuffer.url);
-              this.videoSourceBuffer.appendBuffer(new Uint8Array(videoBuffer.buffer));
-              console.log('>>> [playAsync] => => => buffer appended.');
-            }
-
-            this.playerStatus = 2;
+          // if there is no any buffer, stop the playback.
+          if (!videoBuffer && !audioBuffer) {
+            this.mediaSource.endOfStream();
+            this.playerStatus = 0;
+            break;
           }
+          // append audio buffer
+          if (audioBuffer && !this.audioSourceBuffer.updating) {
+            console.log('>>> [playAsync] => => => append buffer = ', audioBuffer.url);
+            this.audioSourceBuffer.appendBuffer(new Uint8Array(audioBuffer.buffer));
+            console.log('>>> [playAsync] => => => buffer appended.');
+          }
+          // append video buffer
+          if (videoBuffer && !this.videoSourceBuffer.updating) {
+            console.log('>>> [playAsync] => => => append buffer = ', videoBuffer.url);
+            this.videoSourceBuffer.appendBuffer(new Uint8Array(videoBuffer.buffer));
+            console.log('>>> [playAsync] => => => buffer appended.');
+          }
+
+          this.playerStatus = 2;
         }
         await sleep(500);
         console.log('>>> [playAsync] => => => player engine round ', round++); // FOR DEBUG ONLY
@@ -158,19 +156,19 @@ class NXPlayer {
   onMediaSourceOpen() {
     console.log('>>> [onMediaSourceOpen] => => => media source status = ', this.mediaSource.readyState);
     this.videoSourceBuffer = this.mediaSource.addSourceBuffer(this.videoMimeType);
-    // this.audioSourceBuffer = this.mediaSource.addSourceBuffer(this.audioMimeType);
+    this.audioSourceBuffer = this.mediaSource.addSourceBuffer(this.audioMimeType);
     // set source buffser's mode
     this.videoSourceBuffer.mode = this.setting.sourcebuffer.mode;
-    // this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
-    // this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd);
-    this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd);
+    this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
+    this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
+    this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
   }
 
   onBufferIsEnoughForPlay() {
     console.log('>>> [video/audio buffer] => => => video/audio data loaded. ');
     console.log('>>> [onBufferIsEnoughForPlay] => => => buffer is enough for playback');
     if (this.mediaSource.readyState === 'open'
-        && this.videoSourceBuffer) {
+        && this.videoSourceBuffer && this.audioSourceBuffer) {
       this.playerStatus = 1;
     }
   }
