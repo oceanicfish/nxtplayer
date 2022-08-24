@@ -26,6 +26,7 @@ class NXPlayer {
   videoMimeType;
   audioMimeType;
   eventemitter;
+
   /**
    * STATUS:
    * -1: error
@@ -34,6 +35,8 @@ class NXPlayer {
    * 2: loading (start to feed the buffer to media source)
    */
   playerStatus = 0;
+
+  manifestUpdating = false;
 
   constructor(options) {
     this.options = options;
@@ -47,6 +50,7 @@ class NXPlayer {
     this.audioTrack = new NXTMediaTrack('audio', this);
     this.playerStatus = 0;
     this.video = options.video;
+    this.manifestUpdating = false;
   }
 
   /**
@@ -88,9 +92,6 @@ class NXPlayer {
       console.error(err);
     });
 
-    this.video.addEventListener('canplay', function () {
-      this.video.play();
-    });
   }
 
   /**
@@ -101,6 +102,9 @@ class NXPlayer {
     this.videoRepresentationId = id;
   }
 
+  /**
+   * the main playback loop
+   */
   async playAsync() {
     console.log('>>> [playAsync] => => => playAsync starts');
     var round = 0;  // FOR DEBUG ONLY
@@ -115,6 +119,9 @@ class NXPlayer {
             console.log('>>> [playAsync] => => => the buffer has been bigger than 10 seconds ... ');
             if (!this.video.playing || this.video.paused) {
               this.video.play();
+              // if (!this.manifestUpdating) {
+              //   this.startUpdatingManifest();
+              // }
             }
           }
 
@@ -153,6 +160,9 @@ class NXPlayer {
     }
   }
 
+  /**
+   * create audio/video source buffer
+   */
   onMediaSourceOpen() {
     console.log('>>> [onMediaSourceOpen] => => => media source status = ', this.mediaSource.readyState);
     this.videoSourceBuffer = this.mediaSource.addSourceBuffer(this.videoMimeType);
@@ -162,19 +172,38 @@ class NXPlayer {
     this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
     this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
     this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
-  }
-
-  onBufferIsEnoughForPlay() {
-    console.log('>>> [video/audio buffer] => => => video/audio data loaded. ');
-    console.log('>>> [onBufferIsEnoughForPlay] => => => buffer is enough for playback');
     if (this.mediaSource.readyState === 'open'
         && this.videoSourceBuffer && this.audioSourceBuffer) {
       this.playerStatus = 1;
+      this.audioTrack.startBuffering();
+      this.videoTrack.startBuffering();
     }
   }
 
+  /**
+   * Fired when the buffer has been downloaded for playback.
+   */
+  onBufferIsEnoughForPlay() {
+    console.log('>>> [video/audio buffer] => => => video/audio data loaded. ');
+    console.log('>>> [onBufferIsEnoughForPlay] => => => buffer is enough for playback');
+  }
+
+  /**
+   * Fired after the buffer has been appended to source buffer object
+   */
   onSourceBufferUpdateEnd() {
     console.log('>>> [onSourceBufferUpdateEnd] => => => buffer is update end');
+  }
+
+  startUpdatingManifest() {
+    setInterval(async () => {
+      console.log('=> => => [reloadManifest] start');
+      manifestData = await reloadMPD(this.options.url);
+      console.log('=> => => [reloadManifest] manifest reloaded');
+      videoTrack.resetData(manifestData.playlists);
+      audioTrack.resetData(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
+      console.log('=> => => [reloadManifest] end');
+    }, 10 * 1000);
   }
 
 }
