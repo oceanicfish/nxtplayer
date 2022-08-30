@@ -38,43 +38,57 @@ export class NXTMediaTrack {
 
   async startBuffering() {
     while (player.playerStatus > 0) {
+      // to check if the downloaded buffered has reach the target buffer length
       if (this.bufferedLength <= this.targetBufferLength) {
-        var s = this.getSegmentByNumber(this.currentSegmentNumber);
-        if (this.initSegmentUri && s.map.resolvedUri === this.initSegmentUri) {
-          let response = await fetch(s.resolvedUri);
-          if (response.status === 200) {
-            let buffer = await response.arrayBuffer();
-            this.bufferQueue.push({
-              type: 'normal',
-              duration: s.duration,
-              url: s.resolvedUri,
-              buffer: buffer
-            });
-            console.log('(mediatrack.js) >>> [fetched] => => => segment = ', s.resolvedUri);
-            this.bufferedLength = this.bufferedLength + s.duration;
+        // to check if all the segment has been buffered or not 
+        if (this.currentSegmentNumber <= this.getTheLastNumber()) {
+          // if there is segment has not been buffered, and the buffered length is still meet the target, continue to download
+          var s = this.getSegmentByNumber(this.currentSegmentNumber);
+          if (!s) {
+            console.warn('(mediatrack.js) >>> segment does not exist, segment number = ', this.currentSegmentNumber);
             this.currentSegmentNumber++;
+            // break;
           }else {
-            console.error('(mediatrack.js) >>> [fetching failed] => => => segment = ', s.resolvedUri);
+            if (this.initSegmentUri && s.map.resolvedUri === this.initSegmentUri) {
+              let response = await fetch(s.resolvedUri);
+              if (response.status === 200) {
+                let buffer = await response.arrayBuffer();
+                this.bufferQueue.push({
+                  type: 'normal',
+                  duration: s.duration,
+                  url: s.resolvedUri,
+                  buffer: buffer
+                });
+                console.log('(mediatrack.js) >>> [fetched] => => => segment = ', s.resolvedUri);
+                this.bufferedLength = this.bufferedLength + s.duration;
+                this.currentSegmentNumber++;
+              }else {
+                console.error('(mediatrack.js) >>> [fetching failed] => => => segment = ', s.resolvedUri);
+              }
+            } else {
+              this.initSegmentUri = this.getInitSegment(s);
+              let response = await fetch(this.initSegmentUri);
+              if (response.status === 200) {
+                let buffer = await response.arrayBuffer();
+                this.bufferQueue.push({
+                  type: 'init',
+                  duration: 0,
+                  url: this.initSegmentUri,
+                  buffer: buffer
+                });
+                console.log('(mediatrack.js) >>> [init segment fetched] => => => segment = ', this.initSegmentUri);
+              } else {
+                console.error('(mediatrack.js) >>> [init segment fetching failed] => => => segment = ', this.initSegmentUri);
+              }
+            }
           }
-        } else {
-          this.initSegmentUri = this.getInitSegment(s);
-          let response = await fetch(this.initSegmentUri);
-          if (response.status === 200) {
-            let buffer = await response.arrayBuffer();
-            this.bufferQueue.push({
-              type: 'init',
-              duration: 0,
-              url: this.initSegmentUri,
-              buffer: buffer
-            });
-            console.log('(mediatrack.js) >>> [init segment fetched] => => => segment = ', this.initSegmentUri);
-          } else {
-            console.error('(mediatrack.js) >>> [init segment fetching failed] => => => segment = ', this.initSegmentUri);
-          }
+        }else {
+          // if all the semgents have been buffered, wait for the next manifest updating.
+          await sleep(player.waitingTime);
         }
       }else {
         player.eventemitter.emit('nxtBufferIsEnoughForPlay');
-        await sleep(2000);
+        await sleep(player.waitingTime);
       }
     }
   }
@@ -108,6 +122,17 @@ export class NXTMediaTrack {
 
   resetData(representations) {
     this.representations = representations;
+    console.log('(mediatrack.js) => => => [reloadManifest] segment reloaded, new segment is from No.', 
+                  this.getTheFirstNumber(), ' to No.', this.getTheLastNumber());
+  }
+
+  getTheLastNumber() {
+    let length = this.representations[this.representationId].segments.length;
+    return this.representations[this.representationId].segments[length - 1].number;
+  }
+
+  getTheFirstNumber() {
+    return this.representations[this.representationId].segments[0].number;
   }
 
 }

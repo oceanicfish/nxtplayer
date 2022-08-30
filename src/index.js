@@ -36,7 +36,11 @@ class NXPlayer {
    */
   playerStatus = 0;
 
+  // indicator that the player has started the manifest updating.
   manifestUpdating = false;
+
+  // waiting time (default: 2000)
+  waitingTime = 2000;
 
   constructor(options) {
     this.options = options;
@@ -51,6 +55,7 @@ class NXPlayer {
     this.playerStatus = 0;
     this.video = options.video;
     this.manifestUpdating = false;
+    this.waitingTime = 2000;
   }
 
   /**
@@ -58,11 +63,6 @@ class NXPlayer {
    * @returns
    */
   async play() {
-    /** manifest data */
-    var manifestData;
-
-    /** get video element under control */
-    // const video = document.querySelector('video');
 
     /** check if the browser supports MSE or not */
     if (!window.MediaSource) {
@@ -74,7 +74,7 @@ class NXPlayer {
     this.eventemitter.on('nxtBufferIsEnoughForPlay', this.onBufferIsEnoughForPlay.bind(this));
 
     /** parse manifest by 'mpd-parser' */
-    manifestData = await parseMPD(this.options.url);
+    let manifestData = await parseMPD(this.options.url);
     console.log('>>> [manifest] => => => manifest loaded');
     this.videoTrack.prepare(manifestData.playlists);
     this.audioTrack.prepare(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
@@ -83,8 +83,10 @@ class NXPlayer {
     /** set mediaSource to video element */
     this.video.src = window.URL.createObjectURL(this.mediaSource);
     console.log('>>> [play] => => => media source setup, readyState = ', this.mediaSource.readyState);
-
+    /** add listener to MediaSource */
     this.mediaSource.addEventListener('sourceopen', this.onMediaSourceOpen.bind(this));
+    /** initialize EME for DRM */
+    initializeEME(this.options.drm);
 
     this.playAsync()
     .catch((err) => {
@@ -115,25 +117,28 @@ class NXPlayer {
 
         if (this.playerStatus > 0) {
 
-          if (this.video.buffered.length && this.video.buffered.end(0) - this.video.buffered.start(0) > 10) {
-            console.log('>>> [playAsync] => => => the buffer has been bigger than 10 seconds ... ');
+          if (this.video.buffered.length && this.video.buffered.end(0) - this.video.buffered.start(0) > 30) {
+            console.log('>>> [playAsync] => => => the buffer has been bigger than 30 seconds ... ');
             if (!this.video.playing || this.video.paused) {
               this.video.play();
-              // if (!this.manifestUpdating) {
-              //   this.startUpdatingManifest();
-              // }
+              if (!this.manifestUpdating) {
+                this.startUpdatingManifest();
+              }
             }
           }
 
-          console.log('>>> [playAsync] => => => start the buffer feeding ... ');
+          console.log('>>> [playAsync] => => => getting next chunk ... ');
           let audioBuffer = this.audioTrack.nextBufferChunk();
           let videoBuffer = this.videoTrack.nextBufferChunk();
-
+          console.log('>>> [playAsync] => => => getting next chunk end ');
           // if there is no any buffer, stop the playback.
           if (!videoBuffer && !audioBuffer) {
-            this.mediaSource.endOfStream();
-            this.playerStatus = 0;
-            break;
+            // this.mediaSource.endOfStream();
+            // this.playerStatus = 0;
+            // break;
+            console.log('>>> [playAsync] => => => next chunk is empty, wait for next updating ... ');
+            await sleep(this.waitingTime);
+            continue;
           }
           // append audio buffer
           if (audioBuffer && !this.audioSourceBuffer.updating) {
@@ -150,7 +155,8 @@ class NXPlayer {
 
           this.playerStatus = 2;
         }
-        await sleep(500);
+        // wait for time that equals the segment duration
+        await sleep(this.waitingTime);
         console.log('>>> [playAsync] => => => player engine round ', round++); // FOR DEBUG ONLY
       }
     } catch(err) {
@@ -196,14 +202,15 @@ class NXPlayer {
   }
 
   startUpdatingManifest() {
+    this.manifestUpdating = true;
+    console.log('=> => => [reloadManifest] manifest updating job starts ...');
     setInterval(async () => {
       console.log('=> => => [reloadManifest] start');
-      manifestData = await reloadMPD(this.options.url);
+      let manifestData = await reloadMPD(this.options.url);
+      this.videoTrack.resetData(manifestData.playlists);
+      this.audioTrack.resetData(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
       console.log('=> => => [reloadManifest] manifest reloaded');
-      videoTrack.resetData(manifestData.playlists);
-      audioTrack.resetData(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
-      console.log('=> => => [reloadManifest] end');
-    }, 10 * 1000);
+    }, 6 * 1000);
   }
 
 }

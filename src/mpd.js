@@ -15,6 +15,7 @@ async function reloadMPD(manifestUri) {
     const res = await fetch(manifestUri);
     const manifest = await res.text();
     var newParsedManifest = mpdParser(manifest, { manifestUri, previousManifest: parsedManifest });
+    parsedManifest = newParsedManifest;
     return newParsedManifest;
 }
 
