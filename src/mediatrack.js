@@ -1,5 +1,7 @@
 import { sleep } from "./utils";
 
+const EventEmitter = require('events');
+
 export class NXTMediaTrack {
   type;
   segments = [];
@@ -16,24 +18,93 @@ export class NXTMediaTrack {
    * 2: buffer queue is full, stop fetching new segment 
    */
   status = 0; 
+  sourceBufferIsAppending = false;
   initSegmentUri;
+  currentAppendingChunk;
+
+  player;
+  sourcebuffer;
+  event;
+
+  isPlayingAd;
 
   constructor(type, player) {
     this.type = type;
+    this.player = player;
+    if (type === 'video') {
+      this.sourcebuffer = this.player.videoSourceBuffer;
+    } else {
+      this.sourcebuffer = this.player.audioSourceBuffer;
+    }
     this.segments = [];
     this.representations = [];
     this.representationId = 0;
     this.bufferQueue = [];
-    this.targetBufferLength = 60;
+    this.targetBufferLength = 120;
     this.bufferedLength = 0;
     this.currentSegmentNumber = 0;
     this.status = 0;
     this.initSegmentUri = null;
+    this.sourceBufferIsAppending = false;
+    this.event = new EventEmitter();
+    this.isPlayingAd = false;
+
+    /** setup event listeners */
+    this.event.on('nxtBufferIsEnoughForPlay', this.onBufferIsEnoughForPlay.bind(this));
   }
 
-  async prepare(representations) {
+  async prepare() {
     this.bufferedLength = 0;
-    this.representations = representations;
+    if (this.type === 'video') {
+      this.representations = this.player.manifestData.playlists;
+    } else {
+      this.representations = this.player.manifestData.mediaGroups.AUDIO.audio.eng.playlists;
+    }
+  }
+
+  async startFeedingBuffer() {
+    this.sourcebuffer.addEventListener('updatestart', this.onSourceBufferUpdateStart);
+    // this.sourcebuffer.addEventListener('update', this.onSourceBufferUpdate().bind(this));
+    this.sourcebuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd);
+    var firstFeeding = true;
+    var error;
+    while (!error) {
+      if (this.sourcebuffer.updating) {
+        // wait for updatedend event for 0.1s
+        await sleep(100);
+      } else {
+        try {
+          // append buffer
+          let chunk = this.nextBufferChunk();
+          this.currentAppendingChunk = chunk;
+          console.log('(mediatrack.js) >>> [Buffer Append] => => => chunk = ', this.currentAppendingChunk.url);
+          // this.sourcebuffer.mode = 'segments';
+          // if (chunk.type === 'normal') {
+          //   // if (chunk.uri.startsWith('asset')) {
+          //   //   if (!this.isPlayingAd) {
+          //   //     this.sourcebuffer.appendWindowEnd = player.video.buffered.end(0) + 10;
+          //   //     this.isPlayingAd = true;
+          //   //   }
+          //   // } else {
+          //   //   if (this.isPlayingAd) {
+          //   //     this.sourcebuffer.appendWindowEnd = Infinity;
+          //   //     this.isPlayingAd = false;
+          //   //   }
+          //   // }
+          //   // if (firstFeeding) {
+          //   //   video.currentTime = chunk.presentationTime;
+          //   //   firstFeeding = false;
+          //   // }
+          // }
+          this.sourcebuffer.appendBuffer(new Uint8Array(chunk.buffer));
+          // }
+        } catch (e) {
+          error = e;
+          console.error('>>> (mediatrack.js) => => => Error: ', error);
+          break;
+        }
+      }
+    }
   }
 
   async startBuffering() {
@@ -56,6 +127,9 @@ export class NXTMediaTrack {
                 this.bufferQueue.push({
                   type: 'normal',
                   duration: s.duration,
+                  presentationTime: s.timeline,
+                  isEndOfPeriod: this.isEndOfPeriod(s),
+                  uri: s.uri,
                   url: s.resolvedUri,
                   buffer: buffer
                 });
@@ -82,13 +156,13 @@ export class NXTMediaTrack {
               }
             }
           }
-        }else {
+        } else {
           // if all the semgents have been buffered, wait for the next manifest updating.
-          await sleep(player.waitingTime);
+          await sleep(6000); // minimum update time
         }
-      }else {
-        player.eventemitter.emit('nxtBufferIsEnoughForPlay');
-        await sleep(player.waitingTime);
+      } else {
+        this.event.emit('nxtBufferIsEnoughForPlay');
+        await sleep(500); // segment length;
       }
     }
   }
@@ -135,4 +209,43 @@ export class NXTMediaTrack {
     return this.representations[this.representationId].segments[0].number;
   }
 
+  isEndOfPeriod(s) {
+    let discontinuity = this.representations[0].discontinuityStarts;
+    if (discontinuity.indexOf(s.number) !== -1) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * --------------------------------------------- -------------- --------------------------------------------------- *
+   * --------------------------------------------- event listener --------------------------------------------------- *
+   * --------------------------------------------- -------------- --------------------------------------------------- *
+   */
+
+  /**
+   * Fired when the buffer has been downloaded for playback.
+   */
+  onBufferIsEnoughForPlay() {
+    if (this.status < 2) {
+      console.log('>>> [onBufferIsEnoughForPlay] => => => ', this.type ,' data buffer is enough for playback.');
+      this.status = 2;
+      this.startFeedingBuffer();
+    }
+  }
+
+  onSourceBufferUpdateStart() {
+    console.log('(mediatrack.js) >>> [Buffer Appending Start] => => => chunk = ', this.currentAppendingChunk ? this.currentAppendingChunk.url : 'NaN');
+    this.sourceBufferIsAppending = true;
+  }
+  
+  // onSourceBufferUpdate(mediatrack) {
+  //   console.log('>>> [onSourceBufferUpdateStart] => => => ', mediatrack.type ,' source buffer is updating....');
+  // }
+
+  onSourceBufferUpdateEnd() {
+    console.log('(mediatrack.js) >>> [Buffer Appending End] => => => chunk = ', this.currentAppendingChunk ? this.currentAppendingChunk.url : 'NaN');
+    this.sourceBufferIsAppending = false;
+  }
 }

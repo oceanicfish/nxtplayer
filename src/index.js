@@ -42,6 +42,9 @@ class NXPlayer {
   // waiting time (default: 2000)
   waitingTime = 2000;
 
+  //manifest data
+  manifestData;
+
   constructor(options) {
     this.options = options;
     this.videoRepresentationId = 0;
@@ -50,8 +53,6 @@ class NXPlayer {
     this.videoMimeType = 'video/mp4; codecs="avc1.64001e"';
     this.audioMimeType = 'audio/mp4; codecs="mp4a.40.2"';
     this.eventemitter = new EventEmitter();
-    this.videoTrack = new NXTMediaTrack('video', this);
-    this.audioTrack = new NXTMediaTrack('audio', this);
     this.playerStatus = 0;
     this.video = options.video;
     this.manifestUpdating = false;
@@ -70,15 +71,9 @@ class NXPlayer {
       return;
     }
 
-    /** setup event listeners */
-    this.eventemitter.on('nxtBufferIsEnoughForPlay', this.onBufferIsEnoughForPlay.bind(this));
-
     /** parse manifest by 'mpd-parser' */
-    let manifestData = await parseMPD(this.options.url);
+    this.manifestData = await parseMPD(this.options.url);
     console.log('>>> [manifest] => => => manifest loaded');
-    this.videoTrack.prepare(manifestData.playlists);
-    this.audioTrack.prepare(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
-    console.log('>>> [video/audio buffer] => => => start loading video/audio data ... ');
 
     /** set mediaSource to video element */
     this.video.src = window.URL.createObjectURL(this.mediaSource);
@@ -88,11 +83,15 @@ class NXPlayer {
     /** initialize EME for DRM */
     initializeEME(this.options.drm);
 
-    this.playAsync()
-    .catch((err) => {
-      console.warn('>>> [play] => => => Playback stopped, by the following error ');
-      console.error(err);
+    this.video.addEventListener('canplay', () => {
+      this.video.play();
     });
+
+    // this.playAsync()
+    // .catch((err) => {
+    //   console.warn('>>> [play] => => => Playback stopped, by the following error ');
+    //   console.error(err);
+    // });
 
   }
 
@@ -121,9 +120,9 @@ class NXPlayer {
             console.log('>>> [playAsync] => => => the buffer has been bigger than 30 seconds ... ');
             if (!this.video.playing || this.video.paused) {
               this.video.play();
-              if (!this.manifestUpdating) {
-                this.startUpdatingManifest();
-              }
+              // if (!this.manifestUpdating) {
+              //   this.startUpdatingManifest();
+              // }
             }
           }
 
@@ -173,11 +172,17 @@ class NXPlayer {
     console.log('>>> [onMediaSourceOpen] => => => media source status = ', this.mediaSource.readyState);
     this.videoSourceBuffer = this.mediaSource.addSourceBuffer(this.videoMimeType);
     this.audioSourceBuffer = this.mediaSource.addSourceBuffer(this.audioMimeType);
+    // create media tracks 
+    this.videoTrack = new NXTMediaTrack('video', this);
+    this.audioTrack = new NXTMediaTrack('audio', this);
+    this.videoTrack.prepare();
+    this.audioTrack.prepare();
+    console.log('>>> [video/audio buffer] => => => start loading video/audio data ... ');
     // set source buffser's mode
     this.videoSourceBuffer.mode = this.setting.sourcebuffer.mode;
     this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
-    this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
-    this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
+    // this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
+    // this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
     if (this.mediaSource.readyState === 'open'
         && this.videoSourceBuffer && this.audioSourceBuffer) {
       this.playerStatus = 1;
@@ -186,29 +191,22 @@ class NXPlayer {
     }
   }
 
-  /**
-   * Fired when the buffer has been downloaded for playback.
-   */
-  onBufferIsEnoughForPlay() {
-    console.log('>>> [video/audio buffer] => => => video/audio data loaded. ');
-    console.log('>>> [onBufferIsEnoughForPlay] => => => buffer is enough for playback');
-  }
-
-  /**
-   * Fired after the buffer has been appended to source buffer object
-   */
-  onSourceBufferUpdateEnd() {
-    console.log('>>> [onSourceBufferUpdateEnd] => => => buffer is update end');
-  }
+  // /**
+  //  * Fired after the buffer has been appended to source buffer object
+  //  */
+  // onSourceBufferUpdateEnd() {
+  //   console.log('>>> [onSourceBufferUpdateEnd] => => => buffer is update end');
+  // }
 
   startUpdatingManifest() {
     this.manifestUpdating = true;
     console.log('=> => => [reloadManifest] manifest updating job starts ...');
     setInterval(async () => {
       console.log('=> => => [reloadManifest] start');
-      let manifestData = await reloadMPD(this.options.url);
-      this.videoTrack.resetData(manifestData.playlists);
-      this.audioTrack.resetData(manifestData.mediaGroups.AUDIO.audio.eng.playlists);
+      let newManifestData = await reloadMPD(this.options.url);
+      this.videoTrack.resetData(newManifestData.playlists);
+      this.audioTrack.resetData(newManifestData.mediaGroups.AUDIO.audio.eng.playlists);
+      this.manifestData = newManifestData;
       console.log('=> => => [reloadManifest] manifest reloaded');
     }, 6 * 1000);
   }
