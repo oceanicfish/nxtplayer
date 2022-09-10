@@ -87,12 +87,19 @@ class NXPlayer {
       this.video.play();
     });
 
+    // this.video.addEventListener('waiting', () => {
+    //   console.log('>>> [waiting] => => => jump to AD period');
+    //   // this.videoSourceBuffer.timestampOffset = 0;
+    //   // this.audioSourceBuffer.timestampOffset = 0;
+    //   // this.video.currentTime = ;
+    //   console.log('>>> [waiting] => => => jump to AD period');
+    // });
+
     // this.playAsync()
     // .catch((err) => {
     //   console.warn('>>> [play] => => => Playback stopped, by the following error ');
     //   console.error(err);
     // });
-
   }
 
   /**
@@ -179,8 +186,8 @@ class NXPlayer {
     this.audioTrack.prepare();
     console.log('>>> [video/audio buffer] => => => start loading video/audio data ... ');
     // set source buffser's mode
-    this.videoSourceBuffer.mode = this.setting.sourcebuffer.mode;
-    this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
+    // this.videoSourceBuffer.mode = this.setting.sourcebuffer.mode;
+    // this.audioSourceBuffer.mode = this.setting.sourcebuffer.mode;
     // this.audioSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
     // this.videoSourceBuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd.bind(this));
     if (this.mediaSource.readyState === 'open'
