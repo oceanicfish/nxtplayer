@@ -34,4 +34,8 @@ function setVideoRepresentation(id) {
   player.setVideoRepresentation(id);
 }
 
+setInterval(() => {
+  window.document.getElementById('player_current_time').innerHTML = window.document.getElementById('video').currentTime.toFixed(3);
+}, 10);
+
 // setVideoRepresentation(1);

@@ -46,7 +46,7 @@ export class NXTMediaTrack {
     this.representations = [];
     this.representationId = 0;
     this.bufferQueue = [];
-    this.targetBufferLength = 4 * 60;
+    this.targetBufferLength = 2 * 60;
     this.bufferedLength = 0;
     this.currentSegmentNumber = 0;
     this.status = 0;
@@ -72,8 +72,6 @@ export class NXTMediaTrack {
   }
 
   async startFeedingBuffer() {
-    // this.sourcebuffer.addEventListener('updatestart', this.onSourceBufferUpdateStart);
-    // this.sourcebuffer.addEventListener('update', this.onSourceBufferUpdate().bind(this));
     this.sourcebuffer.addEventListener('updateend', this.onSourceBufferUpdateEnd);
     var firstFeeding = true;
     var offset = 0;
@@ -87,52 +85,30 @@ export class NXTMediaTrack {
         try {
           // append buffer
           let chunk = this.nextBufferChunk();
-          this.currentAppendingChunk = chunk;
-          // console.log('(mediatrack.js) >>> [Buffer Append] => => => chunk = ', this.currentAppendingChunk.url);
-          // if (this.representations[0].discontinuityStarts.indexOf(chunk.number) != -1 || chunk.number === 0) {
-          //   if (chunk.presentationTime != 0) {
-          //     this.sourcebuffer.timestampOffset = -chunk.presentationTime;
-          //   } else {
-          //     this.sourcebuffer.timestampOffset = chunk.presentationTime;
-          //   }
-          // }
+          if (!chunk) {
+            await sleep(1 * 1000);
+          } else {
+            this.currentAppendingChunk = chunk;
+            if (chunk.type === 'normal') {
+              console.log('[append buffer] => => => chunk = ', chunk.uri);
+              if (this.sourcebuffer.buffered.length > 0) {
+                console.log('[', this.type , ' buffer] => => => buffered.length = ', 
+                              this.sourcebuffer.buffered.length, 
+                              ', start = ', this.sourcebuffer.buffered.start(0), 
+                              ', end = ', this.sourcebuffer.buffered.end(0));
+              }
 
-          // if (firstFeeding && chunk.presentationTime) {
-          //   this.sourcebuffer.timestampOffset = -chunk.presentationTime;
-          //   firstFeeding = false;
-          // }
-
-          if (chunk.type === 'normal') {
-            console.log('[append buffer] => => => chunk = ', chunk.uri);
-            // if (this.gaps.indexOf(chunk.number) > 0 || chunk.number === 0) {
-            //   this.sourcebuffer.timestampOffset = offset;
-            // }
-            // offset += chunk.duration;
-            if (this.sourcebuffer.buffered.length > 0) {
-              console.log('[', this.type , ' buffer] => => => buffered.length = ', 
-                            this.sourcebuffer.buffered.length, 
-                            ', start = ', this.sourcebuffer.buffered.start(0), 
-                            ', end = ', this.sourcebuffer.buffered.end(0));
+              if (chunk.uri.startsWith('asset')) {
+                // for Ad period, we need to reset the start position.
+                this.sourcebuffer.timestampOffset = chunk.timeline;
+              } else {
+                // for media period, always set to the beginning of the content.
+                this.sourcebuffer.timestampOffset = 0;
+              }
             }
-
-            if (chunk.uri.startsWith('asset')) {
-              // // if this chunk is an ad chunk
-              // if (this.gaps.indexOf(chunk.number) > 0 || chunk.number === 0) {
-              //   // if this chunk is the first one of a period
-              //   // set the timestampOffset to the beginning of a period
-              //   this.sourcebuffer.timestampOffset = offset;
-              // }
-              // offset = offset + chunk.duration;
-              this.sourcebuffer.timestampOffset = chunk.timeline;
-            } else {
-              // for media period, always set to the beginning of the content.
-              this.sourcebuffer.timestampOffset = 0;
-              // offset = chunk.presentationTime + chunk.duration;
-            }
+            this.sourcebuffer.appendBuffer(new Uint8Array(chunk.buffer));
+            await sleep(100);
           }
-          this.sourcebuffer.appendBuffer(new Uint8Array(chunk.buffer));
-          await sleep(100);
-          // }
         } catch (e) {
           error = e;
           console.error('>>> (mediatrack.js) => => => Error: ', error);
@@ -145,7 +121,7 @@ export class NXTMediaTrack {
   async startBuffering() {
     while (player.playerStatus > 0) {
       // to check if the downloaded buffered has reach the target buffer length
-      // if (this.bufferedLength <= this.targetBufferLength) {
+      if (this.bufferedLength <= this.targetBufferLength) {
         // to check if all the segment has been buffered or not 
         if (this.currentSegmentNumber <= this.getTheLastNumber()) {
           // if there is segment has not been buffered, and the buffered length is still meet the target, continue to download
@@ -156,15 +132,15 @@ export class NXTMediaTrack {
             // break;
           }else {
             if (this.initSegmentUri && s.map.resolvedUri === this.initSegmentUri) {
-              if (this.type === 'video') {
-                if (this.gaps.indexOf(s.number) > 0 || s.number === 0) {
-                    if (s.uri.startsWith('asset')) {
-                      console.log('[gap time] ad => => => ', s.timeline);
-                    } else {
-                      console.log('[gap time] media => => => ', s.timeline);
-                    }
-                }
-              }
+              // if (this.type === 'video') {
+              //   if (this.gaps.indexOf(s.number) > 0 || s.number === 0) {
+              //       if (s.uri.startsWith('asset')) {
+              //         console.log('[gap time] ad => => => ', s.timeline);
+              //       } else {
+              //         console.log('[gap time] media => => => ', s.timeline);
+              //       }
+              //   }
+              // }
               let response = await fetch(s.resolvedUri);
               if (response.status === 200) {
                 let buffer = await response.arrayBuffer();
@@ -204,15 +180,15 @@ export class NXTMediaTrack {
           }
         } else {
           // if all the semgents have been buffered, wait for the next manifest updating.
-          // await sleep(6000); // minimum update time
-          this.event.emit('nxtBufferIsEnoughForPlay');
-          break;
+          console.log('(mediatrack.js) >>> manifest has been run out, waiting for update...');
+          await sleep(6000); // minimum update time
+          console.log('(mediatrack.js) >>> manifest downloading is about to continue...');
+          // break;
         }
-      // } else {
-      //   this.event.emit('nxtBufferIsEnoughForPlay');
-      //   // await sleep(500); // wait for segment comsuming;
-      //   break; // stop downloading
-      // }
+      } else {
+        this.event.emit('nxtBufferIsEnoughForPlay');
+        await sleep(500); // wait for segment comsuming;
+      }
     }
   }
 
@@ -243,10 +219,14 @@ export class NXTMediaTrack {
     return chunk;
   }
 
-  resetData(representations) {
-    this.representations = representations;
-    console.log('(mediatrack.js) => => => [reloadManifest] segment reloaded, new segment is from No.', 
-                  this.getTheFirstNumber(), ' to No.', this.getTheLastNumber());
+  refreshData() {
+    if (this.type === 'video') {
+      this.representations = this.player.manifestData.playlists;
+    } else {
+      this.representations = this.player.manifestData.mediaGroups.AUDIO.audio.eng.playlists;
+    }
+    this.gaps = this.representations[0].discontinuityStarts;
+    console.log('(mediatrack.js) >>> ', this.type, ' track data has been updated');
   }
 
   getTheLastNumber() {
@@ -313,16 +293,13 @@ export class NXTMediaTrack {
     console.log('(mediatrack.js) >>> [Buffer Appending Start] => => => chunk = ', this.currentAppendingChunk ? this.currentAppendingChunk.url : 'NaN');
     this.sourceBufferIsAppending = true;
   }
-  
-  // onSourceBufferUpdate(mediatrack) {
-  //   console.log('>>> [onSourceBufferUpdateStart] => => => ', mediatrack.type ,' source buffer is updating....');
-  // }
+
 
   onSourceBufferUpdateEnd() {
     // console.log('[onSourceBufferUpdateEnd] => => => source buffer buffered length = ', this.buffered.length);
-    for (var i = 0; i < this.buffered.length; i++) {
-      console.log('buffered (', 
-        i ,'): ', this.buffered.start(i), ' ~ ', this.buffered.end(i));
+    if ( this.buffered.length > 0) {
+      let maxIndex = this.buffered.length - 1;
+      console.log('buffered (', maxIndex ,'): ', this.buffered.start(maxIndex), ' ~ ', this.buffered.end(maxIndex));
     }
   }
 }
