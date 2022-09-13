@@ -3,6 +3,7 @@ import { initializeEME } from './drm';
 import { sleep, getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
 import { startABRController } from "./abrcontroller"
+import { PlaybackController } from "./playbackcontroller"
 
 const EventEmitter = require('events');
 
@@ -49,6 +50,8 @@ class NXPlayer {
   bIndex = 0;
   gapWatching = false;
 
+  playbackController;
+
   constructor(options) {
     this.options = options;
     this.videoRepresentationId = 0;
@@ -63,6 +66,7 @@ class NXPlayer {
     this.waitingTime = 2000;
     this.bIndex = 0;
     this.gapWatching = false;
+    this.playbackController = new PlaybackController(this);
   }
 
   /**
@@ -89,17 +93,17 @@ class NXPlayer {
     /** initialize EME for DRM */
     initializeEME(this.options.drm);
 
-    this.video.addEventListener('waiting', () => {
-      if (this.gapWatching) {
-        console.log('>>> [waiting] => => => gap detected');
-        if (this.video.buffered.length > 0) {
-          this.bIndex++;
-          // this.video.currentTime = this.video.buffered.start(this.bIndex);
-          this.video.currentTime = this.video.currentTime + 1;
-        }
-        console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
-      }
-    });
+    // this.video.addEventListener('waiting', () => {
+    //   if (this.gapWatching) {
+    //     console.log('>>> [waiting] => => => gap detected');
+    //     if (this.video.buffered.length > 0) {
+    //       this.bIndex++;
+    //       // this.video.currentTime = this.video.buffered.start(this.bIndex);
+    //       this.video.currentTime = this.video.currentTime + 1;
+    //     }
+    //     console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
+    //   }
+    // });
 
     this.playAsync()
     .catch((err) => {
@@ -132,8 +136,9 @@ class NXPlayer {
               this.video.play();
               this.video.currentTime = this.video.buffered.start(this.bIndex);
               this.startUpdatingManifest();
-              await sleep(1 * 1000)
+              await sleep(0.2 * 1000)
               this.gapWatching = true;
+              this.playbackController.start();
               break;
             }
           }

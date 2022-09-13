@@ -20,10 +20,20 @@
       </div>
       <div class="row">
         <div class="col-md-6 pt-5">
-          <h3><span class="badge bg-danger" id="player_current_time"></span></h3>
-          <button type="button" class="btn btn-secondary" id="rep0" onclick="setVideoRepresentation(0)">0</button>
-          <button type="button" class="btn btn-secondary" id="rep1" onclick="setVideoRepresentation(1)">1</button>
-          <button type="button" class="btn btn-secondary" id="rep2" onclick="setVideoRepresentation(2)">2</button>
+          <ul class="list-inline">
+            <li class="list-inline-item" style="    min-width: 115px; margin-left: 10px;">
+              <span id="player_current_time" class="text-light"></span>
+            </li>
+            <li class="list-inline-item">
+              <button type="button" class="btn btn-secondary" id="rep0" onclick="setVideoRepresentation(0)">0</button>
+            </li>
+            <li class="list-inline-item">
+              <button type="button" class="btn btn-secondary" id="rep1" onclick="setVideoRepresentation(1)">1</button>
+            </li>
+            <li class="list-inline-item">
+              <button type="button" class="btn btn-secondary" id="rep2" onclick="setVideoRepresentation(2)">2</button>
+            </li>
+          </ul>
         </div>
       </div>
     </container>
