@@ -2,11 +2,21 @@
 options = {
   video: window.document.getElementById('video'),
   /******* Multi-Period Live (AWS) *****/
-  url: 'https://d24rwxnt7vw9qb.cloudfront.net/v1/dash/e6d234965645b411ad572802b6c9d5a10799c9c1/All_Reference_Streams/4577dca5f8a44756875ab5cc913cd1f1/index.mpd'
+  // url: 'https://d24rwxnt7vw9qb.cloudfront.net/v1/dash/e6d234965645b411ad572802b6c9d5a10799c9c1/All_Reference_Streams/4577dca5f8a44756875ab5cc913cd1f1/index.mpd'
 
-  /******* Multi-Period Live (AWS) *****/
+  /******* Multi-Period Live (AWS) Key Rotate per 60 seconds *******/
+  url: 'https://d24rwxnt7vw9qb.cloudfront.net/v1/dash/e6d234965645b411ad572802b6c9d5a10799c9c1/All_Reference_Streams/2fc23947945841b9b1be9768f9c13e75/index.mpd',
+  drm: {
+    widevine: {
+      priority: 0,
+      url: 'https://lic.staging.drmtoday.com/license-proxy-widevine/cenc/?specConform=true',
+      customData: 'ewogICAgInVzZXJJZCI6ICJhd3MtZWxlbWVudGFsOjpzcGVrZS10ZXN0aW5nIiwKICAgICJzZXNzaW9uSWQiOiAiZWxlbWVudGFsLXJlZnN0cmVhbSIsCiAgICAibWVyY2hhbnQiOiAiYXdzLWVsZW1lbnRhbCIKfQo=',
+      customDataHeaderKey: 'x-dt-custom-data'
+    }
+  }
 
-  // url: 'https://d24rwxnt7vw9qb.cloudfront.net/v1/dash/e6d234965645b411ad572802b6c9d5a10799c9c1/All_Reference_Streams/2fc23947945841b9b1be9768f9c13e75/index.mpd',
+  /******* Multi-Period Live (AWS) No Key Rotation *****/
+  // url: 'https://d24rwxnt7vw9qb.cloudfront.net/v1/dash/e6d234965645b411ad572802b6c9d5a10799c9c1/All_Reference_Streams//6e16c26536564c2f9dbc5f725a820cff/index.mpd',
   // drm: {
   //   widevine: {
   //     priority: 0,
@@ -17,7 +27,6 @@ options = {
   // }
 
   /** HSC Content */
-
   // url: 'https://9d75bf9c8df341e9a5739514aef339de.mediatailor.ap-northeast-1.amazonaws.com/v1/dash/3df51148bec679d3f9cb66b34261d39d1f5608ae/POC-AD-INSERT/aa8288df63184b94aaa439dd144b55a3/index.mpd',
   // drm: {
   //   widevine: {

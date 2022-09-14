@@ -46,7 +46,7 @@ export class NXTMediaTrack {
     this.representations = [];
     this.representationId = 0;
     this.bufferQueue = [];
-    this.targetBufferLength = 2 * 60;
+    this.targetBufferLength = 0.5 * 60;
     this.bufferedLength = 0;
     this.currentSegmentNumber = 0;
     this.status = 0;
@@ -80,13 +80,13 @@ export class NXTMediaTrack {
     while (!error) {
       if (this.sourcebuffer.updating) {
         // wait for updatedend event for 0.1s
-        await sleep(100);
+        await sleep(500);
       } else {
         try {
           // append buffer
           let chunk = this.nextBufferChunk();
           if (!chunk) {
-            await sleep(1 * 1000);
+            await sleep(0.2 * 1000);
           } else {
             this.currentAppendingChunk = chunk;
             if (chunk.type === 'normal') {
@@ -97,7 +97,9 @@ export class NXTMediaTrack {
                               ', start = ', this.sourcebuffer.buffered.start(0), 
                               ', end = ', this.sourcebuffer.buffered.end(0));
               }
-
+              /**
+               * set timestampOffset individually 
+               */
               if (chunk.uri.startsWith('asset')) {
                 // for Ad period, we need to reset the start position.
                 this.sourcebuffer.timestampOffset = chunk.timeline;
@@ -107,7 +109,7 @@ export class NXTMediaTrack {
               }
             }
             this.sourcebuffer.appendBuffer(new Uint8Array(chunk.buffer));
-            await sleep(100);
+            await sleep(0.2 * 1000);
           }
         } catch (e) {
           error = e;

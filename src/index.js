@@ -1,5 +1,5 @@
 import { parseMPD, reloadMPD } from "./mpd";
-import { initializeEME } from './drm';
+import { DRM } from './drm';
 import { sleep, getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
 import { startABRController } from "./abrcontroller"
@@ -50,6 +50,8 @@ class NXPlayer {
   bIndex = 0;
   gapWatching = false;
 
+  isPlaying = false;
+
   playbackController;
 
   constructor(options) {
@@ -67,6 +69,7 @@ class NXPlayer {
     this.bIndex = 0;
     this.gapWatching = false;
     this.playbackController = new PlaybackController(this);
+    this.isPlaying = false;
   }
 
   /**
@@ -91,19 +94,30 @@ class NXPlayer {
     /** add listener to MediaSource */
     this.mediaSource.addEventListener('sourceopen', this.onMediaSourceOpen.bind(this));
     /** initialize EME for DRM */
-    initializeEME(this.options.drm);
+    let drm = new DRM(this);
+    await drm.initializeEME();
 
-    // this.video.addEventListener('waiting', () => {
-    //   if (this.gapWatching) {
-    //     console.log('>>> [waiting] => => => gap detected');
-    //     if (this.video.buffered.length > 0) {
-    //       this.bIndex++;
-    //       // this.video.currentTime = this.video.buffered.start(this.bIndex);
-    //       this.video.currentTime = this.video.currentTime + 1;
-    //     }
-    //     console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
-    //   }
-    // });
+    this.video.addEventListener('waiting', () => {
+      this.isPlaying = false;
+      // if (this.gapWatching) {
+      //   console.log('>>> [waiting] => => => gap detected');
+      //   if (this.video.buffered.length > 0) {
+      //     this.bIndex++;
+      //     // this.video.currentTime = this.video.buffered.start(this.bIndex);
+      //     this.video.currentTime = this.video.currentTime + 1;
+      //   }
+      //   console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
+      // }
+    });
+    this.video.addEventListener('ended', () => {
+      this.isPlaying = false;
+    });
+    this.video.addEventListener('pause', () => {
+      this.isPlaying = false;
+    });
+    this.video.addEventListener('playing', () => {
+      this.isPlaying = true;
+    });
 
     this.playAsync()
     .catch((err) => {
@@ -134,7 +148,7 @@ class NXPlayer {
               // this.video.currentTime = this.video.buffered.start(0);
               console.warn('>>> [playAsync] => => => PLAYBACK START !!!.');
               this.video.play();
-              this.video.currentTime = this.video.buffered.start(this.bIndex);
+              this.video.currentTime = this.video.buffered.start(this.bIndex) + 0.01;
               this.startUpdatingManifest();
               await sleep(0.2 * 1000)
               this.gapWatching = true;
@@ -177,11 +191,13 @@ class NXPlayer {
     this.manifestUpdating = true;
     console.log('=> => => [reloadManifest] manifest updating job starts ...');
     setInterval(async () => {
-      console.log('=> => => [reloadManifest] start');
-      let newManifestData = await reloadMPD(this.options.url);
-      this.manifestData = newManifestData;
-      this.videoTrack.refreshData();
-      this.audioTrack.refreshData();
+      if (this.isPlaying) {
+        console.log('=> => => [reloadManifest] start');
+        let newManifestData = await reloadMPD(this.options.url);
+        this.manifestData = newManifestData;
+        this.videoTrack.refreshData();
+        this.audioTrack.refreshData();
+      }
     }, 6 * 1000);
   }
 
