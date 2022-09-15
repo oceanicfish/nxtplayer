@@ -41,16 +41,16 @@ export class DRM {
     navigator
       .requestMediaKeySystemAccess(this.keySystems.widevine[0], this.config)
       .then(function (keySystemsAccess) {
-        console.log('=> => => keySystemAccess: ', keySystemsAccess);
+        console.log('(drm.js) => => => keySystemAccess: ', keySystemsAccess);
         return keySystemsAccess.createMediaKeys();
       })
       .then(function (createdMediaKeys) {
-        console.log('=> => => createdMediaKeys', createdMediaKeys);
+        console.log('(drm.js) => => => createdMediaKeys', createdMediaKeys);
         let videoObject = window.document.getElementById('video');
         videoObject.setMediaKeys(createdMediaKeys);
       })
       .catch(function (err) {
-        console.error('=> => => Failed to set up MediaKeys', err);
+        console.error('(drm.js) => => => Failed to set up MediaKeys', err);
       });
   }
 
@@ -64,45 +64,23 @@ export class DRM {
   }
 
   onEncrypted(event) {
-    // console.log('=> => => onEncrypted', event);
+    // console.log('(drm.js) => => => onEncrypted', event);
     if (!this.video.mediaKeys) {
       return;
     }
     if (!this.drmSession) {
       this.drmSession = this.video.mediaKeys.createSession();
       this.drmSession.addEventListener('message', this.onMessage.bind(this));
+      this.drmSession.addEventListener('keystatuseschange', this.onKeyStatusesChange.bind(this));
       this.drmSession.generateRequest(event.initDataType, event.initData)
       .catch(function (err) {
-        console.error('=> => => Failed to request license request', err);
+        console.error('(drm.js) => => => Failed to request license request', err);
       });
     }
-    // this.drmSession.generateRequest(event.initDataType, event.initData)
-    // .catch(function (err) {
-    //   console.error('=> => => Failed to request license request', err);
-    // });
   }
 
   async onMessage(event) {
-    // console.log('=> => => onMessage', event);
-
-    // if (this.license) {
-    //   // var session = event.target;
-    //   // session.update(license)
-    //   // .catch(function (err) {
-    //   //   console.error('=> => => Failed to update the session: ', err);
-    //   // });
-    //   console.log('(drm.js)=> => => license is exist');
-    //   return;
-    // } else {
-    //   let xhr = new XMLHttpRequest();
-    //   xhr.open('POST', this.licenseUrl);
-    //   xhr.setRequestHeader(this.requestHeaderKey, this.customData);
-    //   xhr.responseType = 'arraybuffer';
-    //   xhr.onload = function (event) {
-    //     this.updateLicense(event.target.response);
-    //   }.bind(this);
-    //   xhr.send(event.message);
-    // }
+    console.log('(drm.js) => => => message type = ', event.messageType);
     let xhr = new XMLHttpRequest();
     xhr.open('POST', this.licenseUrl);
     xhr.setRequestHeader(this.requestHeaderKey, this.customData);
@@ -117,42 +95,15 @@ export class DRM {
     this.license = response;
     this.drmSession.update(response)
     .catch((error) => {
-      console.error('=> => => Failed to update the session: ', error);
+      console.error('(drm.js) => => => Failed to update the session: ', error);
     });
   }
 
-  // this.generateLicense(event.message).then(function (license) {
-  //       // console.log('=> => => license: ', license);
-  //       this.license = license;
-  //       let session = event.target;
-  //       session.update(license).catch(function (err) {
-  //         console.error('=> => => Failed to update the session: ', err);
-  //       });
-  //     });
-
-  // async generateLicense(message) {
-  //   return new Promise(function (resolve) {
-  //     let challenge = message;
-  //     console.log('(drm.js) => => => get key with message = ', message);
-  //     return this.getKey(challenge).then(function (key) {
-  //       resolve(key);
-  //     });
-  //   });
-  // }
-
-  // async getKey(challenge) {
-  //   return new Promise(function (resolve) {
-  //     let xhr = new XMLHttpRequest();
-  //     xhr.open('POST', this.licenseUrl, true);
-  //     xhr.setRequestHeader(this.requestHeaderKey, this.customData);
-  //     xhr.responseType = 'arraybuffer';
-  //     xhr.onload = function () {
-  //       console.log('(drm.js) => => => license acquired @ ', Date.now());
-  //       resolve(this.response);
-  //     };
-  //     console.log('(drm.js) => => => acquire license... @ ', Date.now());
-  //     xhr.send(challenge);
-  //   });
-  // }
+  async onKeyStatusesChange(event) {
+    console.log('(drm.js) => => => session key status = ', this.drmSession.keyStatuses);
+    keySession.keyStatuses.forEach((status, keyId) => {
+      console.log('(drm.js) => => => keyId = ', keyId, ', status = ', status);
+    });
+  }
 
 }
