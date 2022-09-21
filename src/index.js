@@ -4,6 +4,7 @@ import { sleep, getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
 import { startABRController } from "./abrcontroller"
 import { PlaybackController } from "./playbackcontroller"
+import { DashManifest } from "./dash/manifest";
 
 const EventEmitter = require('events');
 
@@ -85,6 +86,8 @@ class NXPlayer {
     }
 
     /** parse manifest by 'mpd-parser' */
+    let dash = new DashManifest(this.options.url);
+    let dashMPD = await dash.parseMPD();
     this.manifestData = await parseMPD(this.options.url);
     console.log('>>> [manifest] => => => manifest loaded');
 

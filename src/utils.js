@@ -40,4 +40,30 @@ function getChunkName(url) {
   return chunkName;
 }
 
-export {sleep, getMedia, getChunkName} 
+function getPlaces(template) {
+  let places = 0;
+  let start = template.indexOf('%');
+  let end = template.indexOf('d$');
+  if (start > 0 && end > 0 && end > start) {
+    places =  template.substring(start + 1, end);
+    if (places.startsWith('0')) {
+      places = places.substring(1);
+    }
+  }
+  return places;
+}
+
+function convertToSeconds(periodStart) {
+  let sec = 0;
+  let ps = periodStart.replace('PT', '').replace('S', '');
+  if (ps.indexOf('H') > 0) {
+    ps = ps.replace('H', '*3600+');
+  }
+  if(ps.indexOf('M') > 0) {
+    ps = ps.replace('M', '*60+');
+  }
+  sec = eval(ps);
+  return sec;
+}
+
+export {sleep, getMedia, getChunkName, getPlaces, convertToSeconds} 

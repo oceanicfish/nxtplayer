@@ -1,5 +1,6 @@
 import { parse as mpdParser } from "mpd-parser";
 
+
 var parsedManifest;
 
 async function parseMPD(manifestUri) {
@@ -11,6 +12,12 @@ async function parseMPD(manifestUri) {
   return parsedManifest;
 }
 
+async function parseMPD4test(manifest, uri) {
+  parsedManifest = mpdParser(manifest, { uri });
+  console.log(parsedManifest);
+  return parsedManifest;
+}
+
 async function reloadMPD(manifestUri) {
     const res = await fetch(manifestUri);
     const manifest = await res.text();
@@ -19,4 +26,4 @@ async function reloadMPD(manifestUri) {
     return newParsedManifest;
 }
 
-export { parseMPD, reloadMPD };
+export { parseMPD, parseMPD4test, reloadMPD };
