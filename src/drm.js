@@ -32,9 +32,11 @@ export class DRM {
 
   constructor(nxtPlayer) {
     this.video = nxtPlayer.video;
-    this.drminfo = nxtPlayer.options.drm;
-    this.licenseUrl = this.drminfo.widevine.url;
-    this.customData = this.drminfo.widevine.customData;
+    if (nxtPlayer.options.drm) {
+      this.drminfo = nxtPlayer.options.drm;
+      this.licenseUrl = this.drminfo.widevine.url;
+      this.customData = this.drminfo.widevine.customData;
+    }
   }
 
   async creatKeySystem() {
@@ -55,8 +57,9 @@ export class DRM {
   }
 
   async initializeEME() {
-    if (this.drminfo.widevine.customDataHeaderKey 
-          && this.drminfo.widevine.customDataHeaderKey.length > 0) {
+    if (this.drminfo 
+        && this.drminfo.widevine.customDataHeaderKey 
+        && this.drminfo.widevine.customDataHeaderKey.length > 0) {
       this.requestHeaderKey = this.drminfo.widevine.customDataHeaderKey;
     }
     await this.creatKeySystem();
