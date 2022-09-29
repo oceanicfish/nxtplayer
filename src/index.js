@@ -45,15 +45,15 @@ class NXPlayer {
   waitingTime = 2000;
 
   //manifest data
+  dash;
   manifestData;
 
   // currentPlayingBufferIndex
   bIndex = 0;
   gapWatching = false;
-
   isPlaying = false;
-
   playbackController;
+
 
   constructor(options) {
     this.options = options;
@@ -86,9 +86,10 @@ class NXPlayer {
     }
 
     /** parse manifest by 'mpd-parser' */
-    let dash = new DashManifest(this.options.url);
-    let dashMPD = await dash.parseMPD();
-    this.manifestData = await parseMPD(this.options.url);
+    this.dash = new DashManifest(this.options.url);
+    this.manifestData = await this.dash.parseMPD();
+    /** Open Source Library: mpd-parser **/
+    // this.manifestData = await parseMPD(this.options.url);
     console.log('>>> [manifest] => => => manifest loaded');
 
     /** set mediaSource to video element */
@@ -102,15 +103,15 @@ class NXPlayer {
 
     this.video.addEventListener('waiting', () => {
       this.isPlaying = false;
-      // if (this.gapWatching) {
-      //   console.log('>>> [waiting] => => => gap detected');
-      //   if (this.video.buffered.length > 0) {
-      //     this.bIndex++;
-      //     // this.video.currentTime = this.video.buffered.start(this.bIndex);
-      //     this.video.currentTime = this.video.currentTime + 1;
-      //   }
-      //   console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
-      // }
+    //   // if (this.gapWatching) {
+    //   //   console.log('>>> [waiting] => => => gap detected');
+    //   //   if (this.video.buffered.length > 0) {
+    //   //     this.bIndex++;
+    //   //     // this.video.currentTime = this.video.buffered.start(this.bIndex);
+    //   //     this.video.currentTime = this.video.currentTime + 1;
+    //   //   }
+    //   //   console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
+    //   // }
     });
     this.video.addEventListener('ended', () => {
       this.isPlaying = false;
@@ -149,7 +150,7 @@ class NXPlayer {
           if (this.isPlayable()) {
             if (!this.video.playing || this.video.paused) {
               // this.video.currentTime = this.video.buffered.start(0);
-              console.warn('>>> [playAsync] => => => PLAYBACK START !!!.');
+              console.log('>>> [playAsync] => => => PLAYBACK START !!!.');
               this.video.play();
               this.video.currentTime = this.video.buffered.start(this.bIndex) + 0.01;
               this.startUpdatingManifest();
@@ -196,17 +197,19 @@ class NXPlayer {
     setInterval(async () => {
       if (this.isPlaying) {
         console.log('=> => => [reloadManifest] start');
-        let newManifestData = await reloadMPD(this.options.url);
-        this.manifestData = newManifestData;
+        // let newManifestData = await reloadMPD(this.options.url);
+        // this.manifestData = newManifestData;
+        this.manifestData = await this.dash.parseMPD();
         this.videoTrack.refreshData();
         this.audioTrack.refreshData();
+        console.log('=> => => [reloadManifest] this.manifestData = ', this.manifestData);
       }
     }, 6 * 1000);
   }
 
   isPlayable() {
     if (this.video.buffered.length > 0  && 
-       (this.video.buffered.end(this.video.buffered.length - 1) - this.video.buffered.start(0)) > 60 ) {
+       (this.video.buffered.end(this.video.buffered.length - 1) - this.video.buffered.start(0)) >= 15 ) {
       return true;
     }
     return false;

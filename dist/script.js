@@ -39,6 +39,7 @@ options = {
   // }
 
   /** HSC DRM #2 */
+  // url: 'https://a00c7d94e5c745dfab1c94b884502dcf.mediatailor.ap-northeast-1.amazonaws.com/v1/dash/3df51148bec679d3f9cb66b34261d39d1f5608ae/POC-NEWMOVIE-02-Tailer/9ad0399fd25c46d781729973b9a98357/index.mpd',
   url: 'https://a00c7d94e5c745dfab1c94b884502dcf.mediatailor.ap-northeast-1.amazonaws.com/v1/dash/3df51148bec679d3f9cb66b34261d39d1f5608ae/POC-NEWMOVIE-02-Tailer/9ad0399fd25c46d781729973b9a98357/index.mpd',
   drm: {
     widevine: {

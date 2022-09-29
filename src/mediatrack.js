@@ -46,7 +46,7 @@ export class NXTMediaTrack {
     this.representations = [];
     this.representationId = 0;
     this.bufferQueue = [];
-    this.targetBufferLength = 0.5 * 60;
+    this.targetBufferLength = 0.25 * 60;
     this.bufferedLength = 0;
     this.currentSegmentNumber = 0;
     this.status = 0;
@@ -64,11 +64,11 @@ export class NXTMediaTrack {
   async prepare() {
     this.bufferedLength = 0;
     if (this.type === 'video') {
-      this.representations = this.player.manifestData.playlists;
+      this.representations = this.player.manifestData.video;
     } else {
-      this.representations = this.player.manifestData.mediaGroups.AUDIO.audio.eng.playlists;
+      this.representations = this.player.manifestData.audio;
     }
-    this.gaps = this.representations[0].discontinuityStarts;
+    this.gaps = this.player.manifestData.discontinuityStarts;
   }
 
   async startFeedingBuffer() {
@@ -91,12 +91,6 @@ export class NXTMediaTrack {
             this.currentAppendingChunk = chunk;
             if (chunk.type === 'normal') {
               console.log('[append buffer] => => => chunk = ', chunk.uri);
-              if (this.sourcebuffer.buffered.length > 0) {
-                console.log('[', this.type , ' buffer] => => => buffered.length = ', 
-                              this.sourcebuffer.buffered.length, 
-                              ', start = ', this.sourcebuffer.buffered.start(0), 
-                              ', end = ', this.sourcebuffer.buffered.end(0));
-              }
               /**
                * set timestampOffset individually 
                */
@@ -133,7 +127,8 @@ export class NXTMediaTrack {
             this.currentSegmentNumber++;
             // break;
           }else {
-            if (this.initSegmentUri && s.map.resolvedUri === this.initSegmentUri) {
+            let resolvedUri = s.baseUrl + s.uri;
+            if (this.initSegmentUri && this.getInitSegment(s) === this.initSegmentUri) {
               // if (this.type === 'video') {
               //   if (this.gaps.indexOf(s.number) > 0 || s.number === 0) {
               //       if (s.uri.startsWith('asset')) {
@@ -143,7 +138,7 @@ export class NXTMediaTrack {
               //       }
               //   }
               // }
-              let response = await fetch(s.resolvedUri);
+              let response = await fetch(resolvedUri);
               if (response.status === 200) {
                 let buffer = await response.arrayBuffer();
                 this.bufferQueue.push({
@@ -154,14 +149,15 @@ export class NXTMediaTrack {
                   timeline: s.timeline,
                   isEndOfPeriod: this.isEndOfPeriod(s),
                   uri: s.uri,
-                  url: s.resolvedUri,
+                  url: resolvedUri,
                   buffer: buffer
                 });
-                // console.log('(mediatrack.js) >>> [fetched] => => => segment = ', s.resolvedUri);
+                console.log('(mediatrack.js) >>> [fetched] => => => segment = ', resolvedUri);
                 this.bufferedLength = this.bufferedLength + s.duration;
+                // console.log('(mediatrack.js) => => => this.bufferedLength = ', this.bufferedLength);
                 this.currentSegmentNumber++;
               }else {
-                console.error('(mediatrack.js) >>> [fetching failed] => => => segment = ', s.resolvedUri);
+                console.error('(mediatrack.js) >>> [fetching failed] => => => segment = ', resolvedUri);
               }
             } else {
               this.initSegmentUri = this.getInitSegment(s);
@@ -183,6 +179,8 @@ export class NXTMediaTrack {
         } else {
           // if all the semgents have been buffered, wait for the next manifest updating.
           console.log('(mediatrack.js) >>> manifest has been run out, waiting for update...');
+          console.log('this.getTheLastNumber() = ', this.getTheLastNumber());
+          console.log('this.currentSegmentNumber = ', this.currentSegmentNumber);
           await sleep(6000); // minimum update time
           console.log('(mediatrack.js) >>> manifest downloading is about to continue...');
           // break;
@@ -210,7 +208,7 @@ export class NXTMediaTrack {
   }
 
   getInitSegment(segment) {
-    return segment.map.resolvedUri;
+    return segment.baseUrl + segment.init;
   }
 
   nextBufferChunk() {
@@ -223,11 +221,11 @@ export class NXTMediaTrack {
 
   refreshData() {
     if (this.type === 'video') {
-      this.representations = this.player.manifestData.playlists;
+      this.representations = this.player.manifestData.video;
     } else {
-      this.representations = this.player.manifestData.mediaGroups.AUDIO.audio.eng.playlists;
+      this.representations = this.player.manifestData.audio;
     }
-    this.gaps = this.representations[0].discontinuityStarts;
+    this.gaps = this.player.manifestData.discontinuityStarts;
     console.log('(mediatrack.js) >>> ', this.type, ' track data has been updated');
   }
 
@@ -241,8 +239,7 @@ export class NXTMediaTrack {
   }
 
   isEndOfPeriod(s) {
-    let discontinuity = this.representations[0].discontinuityStarts;
-    if (discontinuity.indexOf(s.number) !== -1) {
+    if (this.gaps.indexOf(s.number) !== -1) {
       return true;
     } else {
       return false;

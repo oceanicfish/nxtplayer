@@ -1,6 +1,6 @@
 import { getPlaces, convertToSeconds } from "../utils";
 
-export class VideoTrack{
+export class AudioTrack{
     segmentNumbers = [];
     discontinuities = [];
     representations = [];
@@ -12,7 +12,7 @@ export class VideoTrack{
      * Read representations from mpd
      * @param {*} mpd 
      */
-     parse(mpd) {
+    parse(mpd) {
         let updatedStartNumber = 0;
         let periods = mpd.MPD.Period;
         periods.forEach(p => {
@@ -21,7 +21,7 @@ export class VideoTrack{
             let baseUrl = p.BaseURL ? p.BaseURL : mpd.MPD.BaseURL;
             let adaptationSets = p.AdaptationSet;
             adaptationSets.forEach(as => {
-                if (as.$.mimeType === 'video/mp4') {
+                if (as.$.mimeType === 'audio/mp4') {
                     let reps = as.Representation;
                     let rootTemplates = as.SegmentTemplate;
                     reps.forEach(r => {
@@ -43,25 +43,17 @@ export class VideoTrack{
 
                         // Get Representation information.
                         let repId = r.$.id;
-                        let width = r.$.width;
-                        let height = r.$.height;
-                        let bandwidth = r.$.bandwidth;
-                        let codec = r.$.codecs;
+                        let audioSamplingRate = r.$.audioSamplingRate;
+                        let codec = r.$.codecs
                         
                         // insert segments to representations
                         if (this.representations.find( e => e.id === repId)) {
                             // Representation is exist already.
                             let targetRepresentation = this.representations.find( e => e.id === repId);
                             let number = this.segmentNumbers.find(e => e.repId === repId).number;
-                            // let number = 0;
-                            // if (this.segmentNumbers.find(e => e.repId === targetRepresentation.$.id)) {
-                            //     number = this.segmentNumbers.find(e => e.repId === targetRepresentation.$.id).number;
-                            // }else {
-                            //     this.segmentNumbers.push({repId: targetRepresentation.$.id, sn: number});
-                            // }
                             if (targetRepresentation.segments) {
                                 segments.forEach(se => {
-                                    let fullPath = se.baseUrl + se.uri + se.timeline;
+                                    let fullPath = se.baseUrl + se.uri + se.timeline
                                     // for the first time parse manifest, all segments would be pushed into the list 
                                     // for updating manifest, only the new segments would be pushed into the list
                                     if (targetRepresentation.segments.find( e => (e.baseUrl + e.uri + e.timeline) === fullPath)) {
@@ -82,7 +74,6 @@ export class VideoTrack{
                                         }
                                     }
                                 });
-                                // save the lastest number.
                                 this.segmentNumbers.find(e => e.repId === repId).number = number;
                             }else {
                                 targetRepresentation.segments = segments;
@@ -91,11 +82,9 @@ export class VideoTrack{
                             // Representation has not been created yet.
                             let newRepresentation = {
                                 id: repId,
-                                width: width,
-                                height: height,
-                                bandwidth: bandwidth,
-                                segments: [],
-                                codec: codec
+                                audioSamplingRate: audioSamplingRate,
+                                codec: codec,
+                                segments: []
                             };
                             let number = 0;
                             segments.forEach(se => {
@@ -109,10 +98,6 @@ export class VideoTrack{
                 }
             });
         });
-    }
-
-    update() {
-        console.log("starts update manifest...");
     }
 
     /**
@@ -173,7 +158,7 @@ export class VideoTrack{
                     presentationtime: presentationTime
                 });
 
-                // this.segmentNumbers.find(e => e.repId === representation.$.id).sn = sn;
+                // this.sns.find(e => e.repId === representation.$.id).sn = sn;
             }
         });
         return uris;
@@ -227,7 +212,7 @@ export class VideoTrack{
                     presentationtime: presentationTime
                 });
 
-                // this.segmentNumbers.find(e => e.repId === representation.$.id).sn = sn;
+                // this.sns.find(e => e.repId === representation.$.id).sn = sn;
             }
         });
         return uris;

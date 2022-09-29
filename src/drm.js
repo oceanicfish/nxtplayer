@@ -32,9 +32,11 @@ export class DRM {
 
   constructor(nxtPlayer) {
     this.video = nxtPlayer.video;
-    this.drminfo = nxtPlayer.options.drm;
-    this.licenseUrl = this.drminfo.widevine.url;
-    this.customData = this.drminfo.widevine.customData;
+    if (nxtPlayer.options.drm) {
+      this.drminfo = nxtPlayer.options.drm;
+      this.licenseUrl = this.drminfo.widevine.url;
+      this.customData = this.drminfo.widevine.customData;
+    }
   }
 
   async creatKeySystem() {
@@ -55,7 +57,8 @@ export class DRM {
   }
 
   async initializeEME() {
-    if (this.drminfo.widevine.customDataHeaderKey 
+    if (this.drminfo 
+          && this.drminfo.widevine.customDataHeaderKey 
           && this.drminfo.widevine.customDataHeaderKey.length > 0) {
       this.requestHeaderKey = this.drminfo.widevine.customDataHeaderKey;
     }
@@ -101,7 +104,7 @@ export class DRM {
 
   async onKeyStatusesChange(event) {
     console.log('(drm.js) => => => session key status = ', this.drmSession.keyStatuses);
-    keySession.keyStatuses.forEach((status, keyId) => {
+    this.drmSession.keyStatuses.forEach((status, keyId) => {
       console.log('(drm.js) => => => keyId = ', keyId, ', status = ', status);
     });
   }
