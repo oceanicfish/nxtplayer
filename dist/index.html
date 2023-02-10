@@ -14,26 +14,74 @@
   <body style="background-color:black;">
     <container>
       <div class="row">
-        <div class="col-md-6 pt-5">
+        <div class="col-lg-6 pt-3 ps-3">
           <video id="video" autoplay controls style="width:100%; height:auto;"></video>
+          <div class="col-lg-6 pt-1">
+            <ul class="list-inline">
+              <li class="list-inline-item" style="min-width: 115px; margin-left: 10px;">
+                <span id="player_current_time" class="text-light"></span>
+              </li>
+            </ul>
+          </div>
         </div>
-      </div>
-      <div class="row">
-        <div class="col-md-6 pt-5">
-          <ul class="list-inline">
-            <li class="list-inline-item" style="min-width: 115px; margin-left: 10px;">
-              <span id="player_current_time" class="text-light"></span>
-            </li>
-            <!-- <li class="list-inline-item">
-              <button type="button" class="btn btn-secondary" id="rep0" onclick="setVideoRepresentation(0)">0</button>
-            </li>
-            <li class="list-inline-item">
-              <button type="button" class="btn btn-secondary" id="rep1" onclick="setVideoRepresentation(1)">1</button>
-            </li>
-            <li class="list-inline-item">
-              <button type="button" class="btn btn-secondary" id="rep2" onclick="setVideoRepresentation(2)">2</button>
-            </li> -->
-          </ul>
+        <div class="col-lg-6 pt-1">
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(0)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#1 DASH.js Clear</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Multiperiod, Number + Timeline, Compact manifest, Thumbnails (1 track) Clear</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(1)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#2 DASH.js Clear</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Multiperiod, Time + Timeline, Compact manifest, Thumbnails (1 track) Clear</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(2)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#3 DASH.js SCTE-35 events</h6>
+              </div>
+              <p class="mb-1 fw-lighter">SCTE-35 events</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1 text-secondary">#4 AWS MediaPackage Widevine (key rotation 60s)</h6>
+                <small class="badge bg-danger">NOT AVAILABLE</small>
+              </div>
+              <p class="mb-1 fw-lighter text-secondary">AWS Multiperiod, Number + Timeline, Compact manifest, Thumbnails (1 track), Encryption (1 key) Widevine (DRMtoday), Key rotation (60s)</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(3)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#5 AWS MediaPackage Widevine (no key rotation)</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Multiperiod, Number + Timeline, Compact manifest, Thumbnails (1 track), Encryption (1 key) Widevine (DRMtoday), no Key rotation</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(4)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#6 HSC MediaPackage DASH with Ad</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Single Period, Time + Timeline, Compact manifest, Widevine</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(5)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#7 HSC MediaPackage DASH with Ad Widevine</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Multiperiod, Location Changing, Time + Timeline, Compact manifest, Widevine</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(6)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#7 HSC MediaPackage DASH with Ad #2 Widevine</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Multiperiod, Location Changing, Time + Timeline, Compact manifest, Widevine</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(7)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#7 HSC MediaPackage DASH with Ad #2 PlayReady</h6>
+              </div>
+              <p class="mb-1 fw-lighter">AWS Multiperiod, Location Changing, Time + Timeline, Compact manifest, PlayReady</p>
+            </a>
+          </div>
         </div>
       </div>
     </container>

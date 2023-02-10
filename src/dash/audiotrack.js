@@ -125,7 +125,7 @@ export class AudioTrack{
      * @returns 
      */
     calculateLiveSegmentsByTime(template, representation, periodStart, baseUrl) {
-        console.log('calculate live segments by times');
+        // console.log('calculate live segments by times');
         let uris = [];
         // let sn = 0;
         // if (this.sns.find(e => e.repId === representation.$.id)) {
@@ -155,7 +155,7 @@ export class AudioTrack{
                     duration: duration,
                     init: initUri,
                     // number: sn++,
-                    presentationtime: presentationTime
+                    presentationTime: presentationTime
                 });
 
                 // this.sns.find(e => e.repId === representation.$.id).sn = sn;
@@ -173,7 +173,7 @@ export class AudioTrack{
      * @returns 
      */
     calculateLiveSegmentsByNumber(template, representation, periodStart, baseUrl) {
-        console.log('calculate live segments by number');
+        // console.log('calculate live segments by number');
         let uris = [];
         // let sn = 0;
         // if (this.sns.find(e => e.repId === representation.$.id)) {
@@ -209,7 +209,7 @@ export class AudioTrack{
                     duration: duration,
                     init: initUri,
                     // number: sn++,
-                    presentationtime: presentationTime
+                    presentationTime: presentationTime
                 });
 
                 // this.sns.find(e => e.repId === representation.$.id).sn = sn;

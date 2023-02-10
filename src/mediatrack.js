@@ -1,6 +1,7 @@
 import { sleep } from "./utils";
 
 const EventEmitter = require('events');
+const ISOBoxer = require('codem-isoboxer');
 
 export class NXTMediaTrack {
   type;
@@ -37,10 +38,8 @@ export class NXTMediaTrack {
     this.player = player;
     if (type === 'video') {
       this.sourcebuffer = player.videoSourceBuffer;
-      // this.sourcebuffer = player.mediaSource.addSourceBuffer('video/mp4; codecs="avc1.64001e"');
     } else {
       this.sourcebuffer = player.audioSourceBuffer;
-      // this.sourcebuffer = player.mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"');
     }
     this.segments = [];
     this.representations = [];
@@ -78,9 +77,8 @@ export class NXTMediaTrack {
     var timeline = 0;
     var error;
     while (!error) {
-      if (this.sourcebuffer.updating) {
-        // wait for updatedend event for 0.1s
-        await sleep(500);
+      if (this.sourcebuffer.updating || this.isBufferFull()) {
+        await sleep(0.5 * 1000);
       } else {
         try {
           // append buffer
@@ -90,7 +88,6 @@ export class NXTMediaTrack {
           } else {
             this.currentAppendingChunk = chunk;
             if (chunk.type === 'normal') {
-              console.log('[append buffer] => => => chunk = ', chunk.uri);
               /**
                * set timestampOffset individually 
                */
@@ -103,6 +100,7 @@ export class NXTMediaTrack {
               }
             }
             this.sourcebuffer.appendBuffer(new Uint8Array(chunk.buffer));
+            console.log('chunk ', chunk.number, ' has been appended.');
             await sleep(0.2 * 1000);
           }
         } catch (e) {
@@ -129,18 +127,12 @@ export class NXTMediaTrack {
           }else {
             let resolvedUri = s.baseUrl + s.uri;
             if (this.initSegmentUri && this.getInitSegment(s) === this.initSegmentUri) {
-              // if (this.type === 'video') {
-              //   if (this.gaps.indexOf(s.number) > 0 || s.number === 0) {
-              //       if (s.uri.startsWith('asset')) {
-              //         console.log('[gap time] ad => => => ', s.timeline);
-              //       } else {
-              //         console.log('[gap time] media => => => ', s.timeline);
-              //       }
-              //   }
-              // }
               let response = await fetch(resolvedUri);
               if (response.status === 200) {
                 let buffer = await response.arrayBuffer();
+                let bufferParser = ISOBoxer.parseBuffer(buffer);
+                let emsg = bufferParser.fetch('emsg');
+                console.log('(mediatrack.js) >>> [arraybuffer parsed] => => => emsg: ', emsg);
                 this.bufferQueue.push({
                   type: 'normal',
                   number: s.number,
@@ -152,9 +144,8 @@ export class NXTMediaTrack {
                   url: resolvedUri,
                   buffer: buffer
                 });
-                console.log('(mediatrack.js) >>> [fetched] => => => segment = ', resolvedUri);
+                console.log('(mediatrack.js) >>> [fetched] => => => segment ', s.number, ' has been added into bufferQueue.');
                 this.bufferedLength = this.bufferedLength + s.duration;
-                // console.log('(mediatrack.js) => => => this.bufferedLength = ', this.bufferedLength);
                 this.currentSegmentNumber++;
               }else {
                 console.error('(mediatrack.js) >>> [fetching failed] => => => segment = ', resolvedUri);
@@ -170,7 +161,6 @@ export class NXTMediaTrack {
                   url: this.initSegmentUri,
                   buffer: buffer
                 });
-                // console.log('(mediatrack.js) >>> [init segment fetched] => => => segment = ', this.initSegmentUri);
               } else {
                 console.error('(mediatrack.js) >>> [init segment fetching failed] => => => segment = ', this.initSegmentUri);
               }
@@ -187,7 +177,7 @@ export class NXTMediaTrack {
         }
       } else {
         this.event.emit('nxtBufferIsEnoughForPlay');
-        await sleep(500); // wait for segment comsuming;
+        await sleep(0.2 * 1000); // wait for segment comsuming;
       }
     }
   }
@@ -251,7 +241,6 @@ export class NXTMediaTrack {
     if (!s.uri.startsWith('asset')) {
       presentationTime = s.timeline;
       if (s.timeline != this.currentTimeline) {
-        // console.log('media timeline = ', s.timeline);
         this.currentTimeline = s.timeline;
       }
     }
@@ -269,6 +258,21 @@ export class NXTMediaTrack {
       }
     }
     return null;
+  }
+
+  isBufferFull() {
+    if (this.player.video.currentTime > 0) {
+      var bufferEnd = 0;
+      for (var l = 0; l < this.sourcebuffer.buffered.length; l++) {
+        if (bufferEnd < this.sourcebuffer.buffered.end(l)) {
+          bufferEnd = this.sourcebuffer.buffered.end(l);
+        }
+      }
+      if (bufferEnd - this.player.video.currentTime > this.targetBufferLength) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -295,10 +299,8 @@ export class NXTMediaTrack {
 
 
   onSourceBufferUpdateEnd() {
-    // console.log('[onSourceBufferUpdateEnd] => => => source buffer buffered length = ', this.buffered.length);
     if ( this.buffered.length > 0) {
       let maxIndex = this.buffered.length - 1;
-      console.log('buffered (', maxIndex ,'): ', this.buffered.start(maxIndex), ' ~ ', this.buffered.end(maxIndex));
     }
   }
 }

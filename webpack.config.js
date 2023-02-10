@@ -2,7 +2,7 @@ const path = require('path')
 
 module.exports = {  
   mode: 'development',
-  devtool: 'inline-source-map', // make vscode debug working
+  devtool: 'source-map', // make vscode debug working
   entry: path.resolve(__dirname, 'src/index.js'),
   output: {
     path: path.resolve(__dirname, 'dist'),

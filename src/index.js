@@ -1,10 +1,11 @@
-import { parseMPD, reloadMPD } from "./mpd";
-import { DRM } from './drm';
+// import { DRM } from './drm';
+import { Widevine } from './drm/widevine';
+import { Playready } from './drm/playready';
 import { sleep, getMedia } from "./utils";
 import { NXTMediaTrack } from "./mediatrack"
-import { startABRController } from "./abrcontroller"
 import { PlaybackController } from "./playbackcontroller"
 import { DashManifest } from "./dash/manifest";
+import { NativePlayer } from "./nativeplayer";
 
 const EventEmitter = require('events');
 
@@ -79,6 +80,13 @@ class NXPlayer {
    */
   async play() {
 
+    // /**
+    //  * Fairplay
+    //  */
+    // let nativePlayer = new NativePlayer(this.options);
+    // nativePlayer.play();
+    // return;
+
     /** check if the browser supports MSE or not */
     if (!window.MediaSource) {
       console.error('>>> [play] => => => No Media Source API available');
@@ -88,8 +96,6 @@ class NXPlayer {
     /** parse manifest by 'mpd-parser' */
     this.dash = new DashManifest(this.options.url);
     this.manifestData = await this.dash.parseMPD();
-    /** Open Source Library: mpd-parser **/
-    // this.manifestData = await parseMPD(this.options.url);
     console.log('>>> [manifest] => => => manifest loaded');
 
     /** set mediaSource to video element */
@@ -98,20 +104,11 @@ class NXPlayer {
     /** add listener to MediaSource */
     this.mediaSource.addEventListener('sourceopen', this.onMediaSourceOpen.bind(this));
     /** initialize EME for DRM */
-    let drm = new DRM(this);
+    let drm = new Widevine(this);
     await drm.initializeEME();
 
     this.video.addEventListener('waiting', () => {
       this.isPlaying = false;
-    //   // if (this.gapWatching) {
-    //   //   console.log('>>> [waiting] => => => gap detected');
-    //   //   if (this.video.buffered.length > 0) {
-    //   //     this.bIndex++;
-    //   //     // this.video.currentTime = this.video.buffered.start(this.bIndex);
-    //   //     this.video.currentTime = this.video.currentTime + 1;
-    //   //   }
-    //   //   console.log('>>> [waiting] => => => gap jumped, currentTime = ', this.video.buffered.start(this.bIndex), ', current buffer Index = ', this.bIndex);
-    //   // }
     });
     this.video.addEventListener('ended', () => {
       this.isPlaying = false;
@@ -197,19 +194,17 @@ class NXPlayer {
     setInterval(async () => {
       if (this.isPlaying) {
         console.log('=> => => [reloadManifest] start');
-        // let newManifestData = await reloadMPD(this.options.url);
-        // this.manifestData = newManifestData;
         this.manifestData = await this.dash.parseMPD();
         this.videoTrack.refreshData();
         this.audioTrack.refreshData();
-        console.log('=> => => [reloadManifest] this.manifestData = ', this.manifestData);
       }
     }, 6 * 1000);
   }
 
   isPlayable() {
-    if (this.video.buffered.length > 0  && 
-       (this.video.buffered.end(this.video.buffered.length - 1) - this.video.buffered.start(0)) >= 15 ) {
+    let bufferLength = this.video.buffered.length;
+    if (bufferLength > 0  && 
+       (this.video.buffered.end(bufferLength - 1) - this.video.buffered.start(bufferLength - 1)) >= 15 ) {
       return true;
     }
     return false;

@@ -1,0 +1,131 @@
+<!-- Learn front-end development at rocket speed! http://inarocket.com -->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <style>
+      .card-scroll .list-group {
+          max-height: 420px;
+          overflow-y: scroll;
+      }
+    </style>
+    <title>MSE Player Sample</title>
+  </head>
+  
+  <body style="background-color:black;">
+    <container>
+      <div class="row m-1">
+        <div class="col-lg-6 p-1">
+          <video id="video" autoplay controls style="width:100%; height:auto;"></video>
+          <div class="col-lg-6 pt-1">
+            <ul class="list-inline">
+              <li class="list-inline-item" style="min-width: 115px; margin-left: 10px;">
+                <span id="player_current_time" class="text-light"></span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-lg-6 p-1">
+          <div class="card card-scroll">
+            <div class="card-header">
+              HLS Stream
+            </div>
+            <ul id="stream_list" class="list-group list-group-flush">
+
+            </ul>
+            <!-- <li>
+              <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(0)">
+                #1 HLS VOD Clear EXT-X-DISCONTINUITY AWS MediaTailor
+              </a>
+            </li> -->
+          </div>
+          <!-- <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(0)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#1 HLS VOD Clear EXT-X-DISCONTINUITY</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#1 HLS VOD Clear EXT-X-DISCONTINUITY AWS MediaTailor</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(1)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#2 PDTs with large gap</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#2 PDTs with large gap</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(2)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#3 AlexSandbox</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#3 AlexSandbox</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(3)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#4 WLUK Live</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#4 WLUK Live</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(4)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#5 CBS Live</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#5 CBS Live</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(5)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#6 MediaTailor Newsy Samsung</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#6 MediaTailor Newsy Samsung</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(6)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#7 KlowdTV</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#7 KlowdTV</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(7)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#8 魅力足球</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#8 魅力足球</p>
+            </a>
+          </div>
+          <div class="list-group me-3 text-wrap">
+            <a href="#" class="list-group-item list-group-item-action" aria-current="true" onclick="play(8)">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">#9 beIN Sports Xtra</h6>
+              </div>
+              <p class="mb-1 fw-lighter">#9 beIN Sports Xtra</p>
+            </a>
+          </div> -->
+        </div>
+      </div>
+    </container>
+    <!-- Bootstrap 5 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+
+    <!-- local scripts -->
+    <script src="../NXPlayer.js"></script>
+    <script src="sports_streams.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
+
